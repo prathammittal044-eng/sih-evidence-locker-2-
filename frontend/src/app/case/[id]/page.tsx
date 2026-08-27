@@ -28,7 +28,7 @@ export default function CaseDetails() {
 
   const fetchCase = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/cases/${id}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}`);
       setCaseData(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -52,7 +52,7 @@ export default function CaseDetails() {
     const formData = new FormData(e.target);
     formData.append('user_id', currentUserId.toString());
     try {
-      const res = await fetch(`http://localhost:8000/cases/${id}/documents/`, { method: 'POST', body: formData });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}/documents/`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) { alert('Document securely uploaded and sealed!'); fetchCase(); e.target.reset(); }
       else        { alert(`Error: ${data.detail}`); }
@@ -61,7 +61,7 @@ export default function CaseDetails() {
 
   const handleVerify = async (document_id: number) => {
     try {
-      const res  = await fetch(`http://localhost:8000/documents/${document_id}/verify/`);
+      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/documents/${document_id}/verify/`);
       const data = await res.json();
       let msg = 'CRYPTOGRAPHIC INTEGRITY CHECK\n' + '─'.repeat(40) + '\n\n';
       data.integrity_checks.forEach((c: any) => {
@@ -87,7 +87,7 @@ export default function CaseDetails() {
     try {
       const formData = new FormData();
       formData.append('user_id', currentUserId.toString());
-      const res  = await fetch(`http://localhost:8000/cases/${id}/seal/`, { method: 'POST', body: formData });
+      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}/seal/`, { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) { alert(`✅ ${data.message}`); fetchCase(); }
       else        { alert(`Error: ${data.detail}`); }
@@ -96,7 +96,7 @@ export default function CaseDetails() {
   };
 
   const handleDownloadReport = () => {
-    window.open(`http://localhost:8000/cases/${id}/report/`, '_blank');
+    window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}/report/`, '_blank');
   };
 
   if (loading) return (
@@ -424,7 +424,7 @@ export default function CaseDetails() {
                                             </div>
                                             <div className="flex flex-col items-end gap-1.5">
                                               <span className="text-xs text-slate-400">{new Date(v.created_at).toLocaleString()}</span>
-                                              <a href={`http://localhost:8000/files/${v.file_path}?user_id=${currentUserId}&document_id=${doc.id}`}
+                                              <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/files/${v.file_path}?user_id=${currentUserId}&document_id=${doc.id}`}
                                                 target="_blank" rel="noreferrer"
                                                 className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 transition-colors">
                                                 <Download className="w-3 h-3" /> VIEW FILE

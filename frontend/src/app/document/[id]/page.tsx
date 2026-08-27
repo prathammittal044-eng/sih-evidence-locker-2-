@@ -20,7 +20,7 @@ export default function DocumentUpdate() {
     formData.append('user_id', currentUserId.toString());
 
     try {
-      const res = await fetch(`http://localhost:8000/documents/${id}/versions/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/documents/${id}/versions/`, {
         method: 'POST',
         body: formData,
       });
