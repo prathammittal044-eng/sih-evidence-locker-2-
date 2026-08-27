@@ -5,9 +5,9 @@ echo Starting Digital Evidence Locker Prototype...
 
 echo [1/2] Starting Backend API...
 echo Installing/verifying Python dependencies...
-C:\Users\prath\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pip install fastapi uvicorn sqlalchemy pydantic python-multipart pypdf scikit-learn numpy --quiet
+python -m pip install fastapi uvicorn sqlalchemy pydantic python-multipart pypdf scikit-learn numpy --quiet
 
-start cmd /k "cd backend && set PYTHONIOENCODING=utf-8 && C:\Users\prath\AppData\Local\Python\pythoncore-3.14-64\python.exe -m uvicorn main:app --reload"
+start cmd /k "cd backend && set PYTHONIOENCODING=utf-8 && python -m uvicorn main:app --reload"
 
 echo Waiting for backend to start...
 timeout /t 8 /nobreak
@@ -19,7 +19,7 @@ echo Running AI Search Backfill...
 curl -s -X POST http://localhost:8000/search/backfill/
 
 echo [2/2] Starting Frontend UI...
-start cmd /k "cd frontend && npm run dev"
+start cmd /k "cd frontend && echo Installing Node dependencies... && npm install && npm run dev"
 
 echo.
 echo All services started!
