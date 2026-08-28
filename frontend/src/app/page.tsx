@@ -47,7 +47,7 @@ export default function Dashboard() {
   }, []);
 
   const fetchCases = () => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}'}/cases/`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/`)
       .then(res => res.json())
       .then(data => setCases(data))
       .catch(err => console.error('Error fetching cases', err));
@@ -81,7 +81,7 @@ export default function Dashboard() {
 
     // Store metadata as a separate call — we post a "metadata document" after creating the case
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}'}/cases/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

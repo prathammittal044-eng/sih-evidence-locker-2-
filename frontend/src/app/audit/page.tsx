@@ -14,7 +14,7 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}'}/audit-logs/`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/audit-logs/`)
       .then(res => res.json())
       .then(data => setLogs(data))
       .catch(err => console.error(err))
