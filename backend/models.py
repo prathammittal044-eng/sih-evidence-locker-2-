@@ -36,13 +36,23 @@ class DocumentVersion(Base):
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"))
     version_number = Column(Integer)
-    file_path = Column(String)  # Path in MinIO
+    file_path = Column(String)  # Path in uploads/
     file_hash = Column(String)  # SHA-256
     status = Column(String) # 'Active', 'Superseded', 'Inactive'
-    extracted_text = Column(Text, nullable=True) # For AI Search
+    extracted_text = Column(Text, nullable=True)  # For AI Search + OCR Preview
     uploaded_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     document = relationship("Document", back_populates="versions")
+    images = relationship("DocumentImage", back_populates="version", cascade="all, delete-orphan")
+
+class DocumentImage(Base):
+    __tablename__ = "document_images"
+    id = Column(Integer, primary_key=True, index=True)
+    document_version_id = Column(Integer, ForeignKey("document_versions.id"))
+    image_path = Column(String)   # filename inside uploads/ folder
+    page_number = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    version = relationship("DocumentVersion", back_populates="images")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

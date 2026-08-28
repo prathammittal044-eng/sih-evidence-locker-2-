@@ -4,7 +4,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldCheck, UploadCloud, FileText, History, CheckCircle, RefreshCw,
-  FileLock2, Download, CheckCircle2, Lock, AlertTriangle, FileDown, Shield
+  FileLock2, Download, CheckCircle2, Lock, AlertTriangle, FileDown, Shield,
+  ScanText, Image as ImageIcon, ChevronDown, ChevronUp, Eye
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 
@@ -14,6 +15,8 @@ const USERS: Record<number, { name: string; role: string; badge: string }> = {
   3: { name: 'Hon. Judge Patel',      role: 'Judge',    badge: 'JDG-01' },
 };
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function CaseDetails() {
   const { id } = useParams();
   const [caseData, setCaseData]       = useState<any>(null);
@@ -21,6 +24,9 @@ export default function CaseDetails() {
   const [currentUserId, setCurrentUserId] = useState(1);
   const [sealing, setSealing]         = useState(false);
   const [docType, setDocType]         = useState('FIR');
+  const [expandedOCR, setExpandedOCR] = useState<Record<number, boolean>>({});
+  const [expandedImgs, setExpandedImgs] = useState<Record<number, boolean>>({});
+  const [versionImages, setVersionImages] = useState<Record<number, any[]>>({});
 
   const currentUser = USERS[currentUserId] || USERS[1];
   const canUpload   = currentUser.role === 'Officer';
@@ -28,11 +34,30 @@ export default function CaseDetails() {
 
   const fetchCase = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}`);
+      const res = await fetch(`${API}/cases/${id}`);
       setCaseData(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
+
+  const fetchImages = async (versionId: number) => {
+    if (versionImages[versionId] !== undefined) return; // already loaded
+    try {
+      const res = await fetch(`${API}/versions/${versionId}/images/`);
+      const data = await res.json();
+      setVersionImages(prev => ({ ...prev, [versionId]: data }));
+    } catch { setVersionImages(prev => ({ ...prev, [versionId]: [] })); }
+  };
+
+  const toggleOCR = (versionId: number) => {
+    setExpandedOCR(prev => ({ ...prev, [versionId]: !prev[versionId] }));
+  };
+
+  const toggleImgs = (versionId: number) => {
+    if (!expandedImgs[versionId]) fetchImages(versionId);
+    setExpandedImgs(prev => ({ ...prev, [versionId]: !prev[versionId] }));
+  };
+
 
   useEffect(() => {
     fetchCase();
@@ -447,6 +472,91 @@ export default function CaseDetails() {
                                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">SHA-256 Integrity Hash</span>
                                             </div>
                                             <p className="text-xs font-mono text-slate-700 break-all bg-white p-2 rounded border border-slate-100">{v.file_hash}</p>
+                                          </div>
+
+                                          {/* ── OCR TEXT PREVIEW ── */}
+                                          <div className="mt-3 border border-purple-200 rounded-lg overflow-hidden">
+                                            <button
+                                              onClick={() => toggleOCR(v.id)}
+                                              className="w-full flex items-center justify-between px-4 py-2.5 bg-purple-50 hover:bg-purple-100 transition-colors text-left"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <ScanText className="w-4 h-4 text-purple-600" />
+                                                <span className="text-sm font-bold text-purple-800">AI OCR Scan — Extracted Text</span>
+                                                {v.extracted_text
+                                                  ? <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold">{v.extracted_text.split(/\s+/).filter(Boolean).length} words</span>
+                                                  : <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">No text found</span>
+                                                }
+                                              </div>
+                                              {expandedOCR[v.id] ? <ChevronUp className="w-4 h-4 text-purple-500" /> : <ChevronDown className="w-4 h-4 text-purple-500" />}
+                                            </button>
+                                            {expandedOCR[v.id] && (
+                                              <div className="p-4 bg-white border-t border-purple-100">
+                                                {v.extracted_text ? (
+                                                  <pre className="text-xs text-slate-700 whitespace-pre-wrap font-mono bg-slate-50 p-3 rounded border border-slate-200 max-h-64 overflow-y-auto leading-relaxed">
+                                                    {v.extracted_text}
+                                                  </pre>
+                                                ) : (
+                                                  <div className="text-center py-4 text-slate-400">
+                                                    <ScanText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm">No text could be extracted from this file.</p>
+                                                    <p className="text-xs mt-1">This may be a non-text file or OCR was unable to read it.</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* ── EXTRACTED IMAGE GALLERY ── */}
+                                          <div className="mt-2 border border-amber-200 rounded-lg overflow-hidden">
+                                            <button
+                                              onClick={() => toggleImgs(v.id)}
+                                              className="w-full flex items-center justify-between px-4 py-2.5 bg-amber-50 hover:bg-amber-100 transition-colors text-left"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <ImageIcon className="w-4 h-4 text-amber-600" />
+                                                <span className="text-sm font-bold text-amber-800">Extracted Images & Photos</span>
+                                                {versionImages[v.id]?.length > 0 && (
+                                                  <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">{versionImages[v.id].length} found</span>
+                                                )}
+                                              </div>
+                                              {expandedImgs[v.id] ? <ChevronUp className="w-4 h-4 text-amber-500" /> : <ChevronDown className="w-4 h-4 text-amber-500" />}
+                                            </button>
+                                            {expandedImgs[v.id] && (
+                                              <div className="p-4 bg-white border-t border-amber-100">
+                                                {!versionImages[v.id] ? (
+                                                  <p className="text-xs text-slate-400 text-center py-2">Loading images...</p>
+                                                ) : versionImages[v.id].length === 0 ? (
+                                                  <div className="text-center py-4 text-slate-400">
+                                                    <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm">No images were extracted from this file.</p>
+                                                  </div>
+                                                ) : (
+                                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                    {versionImages[v.id].map((img: any, idx: number) => (
+                                                      <a
+                                                        key={img.id}
+                                                        href={`${API}${img.url}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="group relative block rounded-lg overflow-hidden border border-slate-200 hover:border-amber-400 transition-all shadow-sm hover:shadow-md"
+                                                      >
+                                                        <img
+                                                          src={`${API}${img.url}`}
+                                                          alt={`Image ${idx + 1}`}
+                                                          className="w-full h-32 object-cover group-hover:opacity-90 transition-opacity"
+                                                          onError={(e: any) => { e.target.style.display = 'none'; }}
+                                                        />
+                                                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1.5 flex items-center justify-between">
+                                                          <span>Image {idx + 1}</span>
+                                                          <Eye className="w-3 h-3" />
+                                                        </div>
+                                                      </a>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>

@@ -19,6 +19,15 @@ except Exception as e:
     VECTOR_SEARCH_ENABLED = False
     print(f"[VectorSearch] Not available: {e}")
 
+# Load OCR engine
+try:
+    import ocr_engine as ocr
+    OCR_ENABLED = ocr.OCR_AVAILABLE
+    print(f"[OCR] Engine loaded. Tesseract available: {OCR_ENABLED}")
+except Exception as e:
+    OCR_ENABLED = False
+    print(f"[OCR] Not available: {e}")
+
 # --- Role definitions ---
 ROLE_PERMISSIONS = {
     "Officer":  {"can_upload": True,  "can_seal": False, "can_verify": True},
@@ -61,6 +70,20 @@ def run_migrations():
             conn.commit()
         except Exception:
             pass
+        # New: document images table (create via metadata if not exists)
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS document_images (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    document_version_id INTEGER REFERENCES document_versions(id),
+                    image_path TEXT NOT NULL,
+                    page_number INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
 
 run_migrations()
 models.Base.metadata.create_all(bind=engine)
@@ -79,25 +102,78 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # -------------------------------------------------------
-# Text Extraction Helper
+# Text Extraction Helper (with OCR for images and scanned PDFs)
 # -------------------------------------------------------
 def extract_text(file_content: bytes, filename: str) -> str:
+    """Extract text from a file. Uses OCR for images and scanned PDFs."""
     ext = filename.lower().split('.')[-1]
+
     if ext == 'txt':
         try:
             return file_content.decode('utf-8')
         except:
             return ""
+
     elif ext == 'pdf':
+        # Use OCR engine for full PDF processing (text + images + scanned pages)
+        if OCR_ENABLED:
+            text, _ = ocr.process_pdf(file_content, 0, UPLOAD_DIR)
+            if text.strip():
+                return text
+        # Fallback: plain pypdf text extraction
         try:
-            import pypdf
-            import io
-            pdf = pypdf.PdfReader(io.BytesIO(file_content))
-            return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+            import pypdf, io as _io
+            pdf = pypdf.PdfReader(_io.BytesIO(file_content))
+            return "\n".join(p.extract_text() for p in pdf.pages if p.extract_text())
         except Exception as e:
             print(f"PDF extraction failed: {e}")
             return ""
+
+    elif OCR_ENABLED and ocr.is_image_file(filename):
+        # Direct OCR on image files (JPG, PNG, etc.)
+        return ocr.ocr_image_file(file_content)
+
     return ""
+
+
+def extract_and_save_images(file_content: bytes, filename: str, db_version_id: int, db: any) -> list:
+    """
+    After a document is saved, extract embedded images and store them in DocumentImage table.
+    Returns list of saved image filenames.
+    """
+    if not OCR_ENABLED:
+        return []
+
+    saved = []
+    ext = filename.lower().split('.')[-1]
+
+    if ext == 'pdf':
+        _, image_filenames = ocr.process_pdf(file_content, db_version_id, UPLOAD_DIR)
+        for img_file in image_filenames:
+            db_img = models.DocumentImage(
+                document_version_id=db_version_id,
+                image_path=img_file,
+            )
+            db.add(db_img)
+            saved.append(img_file)
+
+    elif ocr.is_image_file(filename):
+        # The uploaded file itself IS the image — save a reference directly
+        img_filename = f"docv{db_version_id}_original.{ext}"
+        img_path = os.path.join(UPLOAD_DIR, img_filename)
+        with open(img_path, 'wb') as f:
+            f.write(file_content)
+        db_img = models.DocumentImage(
+            document_version_id=db_version_id,
+            image_path=img_filename,
+        )
+        db.add(db_img)
+        saved.append(img_filename)
+
+    if saved:
+        db.commit()
+
+    return saved
 
 # -------------------------------------------------------
 # File serving
@@ -332,6 +408,9 @@ def upload_document(
             text=extracted_text
         )
 
+    # --- OCR Image Extraction ---
+    extract_and_save_images(file_content, file.filename, db_version.id, db)
+
     return {"message": "Document uploaded securely", "document_id": db_doc.id, "hash": file_hash}
 
 # -------------------------------------------------------
@@ -408,6 +487,9 @@ def update_document(
             text=extracted_text
         )
 
+    # --- OCR Image Extraction ---
+    extract_and_save_images(file_content, file.filename, new_version.id, db)
+
     return {"message": f"Document updated to version {new_version_num}", "hash": file_hash}
 
 # -------------------------------------------------------
@@ -434,6 +516,34 @@ def verify_document_integrity(document_id: int, db: Session = Depends(get_db)):
         except Exception as e:
             results.append({"version": v.version_number, "status": "ERROR", "message": f"Could not read file: {str(e)}"})
     return {"document_id": document_id, "integrity_checks": results}
+
+# -------------------------------------------------------
+# OCR: Get extracted images for a document version
+# -------------------------------------------------------
+@app.get("/versions/{version_id}/images/")
+def get_version_images(version_id: int, db: Session = Depends(get_db)):
+    """Return all images extracted from a specific document version."""
+    images = db.query(models.DocumentImage).filter(
+        models.DocumentImage.document_version_id == version_id
+    ).all()
+    return [
+        {
+            "id": img.id,
+            "image_path": img.image_path,
+            "url": f"/files/{img.image_path}",
+            "page_number": img.page_number,
+        }
+        for img in images
+    ]
+
+@app.get("/ocr/status/")
+def get_ocr_status():
+    """Return OCR engine availability status."""
+    return {
+        "enabled": OCR_ENABLED,
+        "engine": "Tesseract OCR" if OCR_ENABLED else "Not available",
+        "message": "OCR scanning active — images and scanned PDFs will be processed." if OCR_ENABLED else "Install Tesseract OCR to enable scanning."
+    }
 
 # -------------------------------------------------------
 # True Semantic AI Search (Vector Embeddings via ChromaDB)
