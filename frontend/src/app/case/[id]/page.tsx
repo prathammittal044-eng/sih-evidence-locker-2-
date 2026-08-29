@@ -8,7 +8,6 @@ import {
   ScanText, Image as ImageIcon, ChevronDown, ChevronUp, Eye,
   BrainCircuit, Sparkles, UserCircle, Building2, Map, Calendar
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
 
 const USERS: Record<number, { name: string; role: string; badge: string }> = {
   1: { name: 'Sub-Inspector Sharma', role: 'Officer',  badge: '9482A' },
@@ -145,9 +144,7 @@ export default function CaseDetails() {
   const sealerInfo   = isSealed && caseData.sealed_by ? USERS[caseData.sealed_by] : null;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <Navbar showBack={true} title={`CASE: ${caseData.case_number}`} />
-
+    <div className="text-slate-900 font-sans w-full">
       <main className="p-6 max-w-7xl mx-auto">
 
         {/* SEALED BANNER */}

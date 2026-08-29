@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, Folder, ShieldCheck, FileText, Plus, MapPin, Calendar, Tag, Hash, AlignLeft, Lock } from 'lucide-react';
-import Navbar from '@/components/Navbar';
 
 const CRIME_TYPES = [
   'Theft / Robbery', 'Cyber Crime / Fraud', 'Murder / Attempt to Murder',
@@ -164,9 +163,7 @@ export default function Dashboard() {
   .sort((a, b) => b.score - a.score);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <Navbar />
-
+    <div className="text-slate-900 font-sans w-full">
       <main className="p-6 max-w-[1400px] mx-auto w-full">
         <div className="flex flex-col lg:flex-row gap-6">
           
