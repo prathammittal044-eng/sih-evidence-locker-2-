@@ -4,10 +4,11 @@ set PYTHONIOENCODING=utf-8
 echo Starting Digital Evidence Locker Prototype...
 
 echo [1/2] Starting Backend API...
+set PYTHON_PATH="C:\Users\prath\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 echo Installing/verifying Python dependencies...
-python -m pip install fastapi uvicorn sqlalchemy pydantic python-multipart pypdf scikit-learn numpy pytesseract Pillow "python-jose[cryptography]" --quiet
+%PYTHON_PATH% -m pip install fastapi uvicorn sqlalchemy pydantic python-multipart pypdf scikit-learn numpy pytesseract Pillow "python-jose[cryptography]" networkx spacy --quiet
 
-start cmd /k "cd backend && set PYTHONIOENCODING=utf-8 && python -m uvicorn main:app --reload"
+start cmd /k "cd backend && set PYTHONIOENCODING=utf-8 && %PYTHON_PATH% -m uvicorn main:app --reload"
 
 echo Waiting for backend to start...
 timeout /t 8 /nobreak
