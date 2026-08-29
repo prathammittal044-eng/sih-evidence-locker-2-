@@ -33,8 +33,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
         
         {/* Logo Area */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-700/50 bg-[#061020]">
-          <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow">
-            <span className="text-xl">🔰</span>
+          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow p-1">
+            <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain" />
           </div>
           <div>
             <p className="text-[9px] font-bold tracking-widest text-blue-300 uppercase leading-none mb-0.5">
