@@ -477,19 +477,6 @@ def upload_document(
     object_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, object_name)
     extracted_text = extract_text(file_content, file.filename)
-    
-    # --- AI NLP Insights (Summary + Entities) ---
-    ai_summary = ""
-    entities_json = "{}"
-    try:
-        import nlp_engine
-        import json
-        if extracted_text:
-            nlp_data = nlp_engine.analyze_document(extracted_text)
-            ai_summary = nlp_data.get("summary", "")
-            entities_json = json.dumps(nlp_data.get("entities", {}))
-    except Exception as e:
-        print(f"NLP Engine skipped: {e}")
 
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
@@ -508,17 +495,39 @@ def upload_document(
         file_path=object_name, file_hash=file_hash,
         status="Active", uploaded_by=user_id,
         extracted_text=extracted_text,
-        ai_summary=ai_summary,
-        entities=entities_json
+        ai_summary="",
+        entities="{}"
     )
     db.add(db_version)
+    db.commit()
+    db.refresh(db_version)
+
+    # --- OCR Image Extraction (must happen BEFORE NLP so Gemini Vision can see images) ---
+    saved_image_names = extract_and_save_images(file_content, file.filename, db_version.id, db)
+    image_paths = [os.path.join(UPLOAD_DIR, img) for img in (saved_image_names or [])]
+
+    # --- AI NLP Insights (Summary + Entities) ---
+    ai_summary = ""
+    entities_json = "{}"
+    try:
+        import nlp_engine
+        import json
+        nlp_data = nlp_engine.analyze_document(extracted_text, image_paths=image_paths)
+        ai_summary = nlp_data.get("summary", "")
+        entities_json = json.dumps(nlp_data.get("entities", {}))
+    except Exception as e:
+        print(f"NLP Engine skipped: {e}")
+
+    # Save NLP results back to the version
+    db_version.ai_summary = ai_summary
+    db_version.entities = entities_json
+    db.commit()
 
     u = get_user_info(user_id)
     audit = models.AuditLog(user_id=user_id, action="UPLOAD_DOCUMENT",
         details=f"{u['name']} ({u['role']}, Badge {u['badge']}) uploaded '{name}' ({doc_type}) to Case #{case.case_number}")
     db.add(audit)
     db.commit()
-    db.refresh(db_version)
 
     # --- Vector Index ---
     if VECTOR_SEARCH_ENABLED and extracted_text:
@@ -529,9 +538,6 @@ def upload_document(
             doc_type=doc_type,
             text=extracted_text
         )
-
-    # --- OCR Image Extraction ---
-    extract_and_save_images(file_content, file.filename, db_version.id, db)
 
     return {"message": "Document uploaded securely", "document_id": db_doc.id, "hash": file_hash}
 
