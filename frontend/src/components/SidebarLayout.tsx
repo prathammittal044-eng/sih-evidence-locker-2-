@@ -33,8 +33,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
         
         {/* Logo Area */}
         <div className="h-20 flex items-center gap-3 px-6 border-b border-slate-700/50 bg-[#061020]">
-          <div className="w-14 h-14 flex items-center justify-center flex-shrink-0">
-            <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain filter invert brightness-0" style={{ filter: 'invert(1) brightness(100)' }} />
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-lg p-1.5">
+            <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain" />
           </div>
           <div className="flex flex-col justify-center">
             <p className="text-[10px] font-bold tracking-widest text-blue-300 uppercase leading-tight">
