@@ -5,6 +5,12 @@ import { ShieldAlert, Activity, FileText, Upload, RefreshCw, Eye } from 'lucide-
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+const USERS: Record<number, { name: string; role: string; badge: string }> = {
+  1: { name: 'Sub-Inspector Sharma', role: 'Officer',  badge: '9482A' },
+  2: { name: 'Chief Inspector Verma', role: 'Reviewer', badge: '1109X' },
+  3: { name: 'Hon. Judge Patel',      role: 'Judge',    badge: 'JDG-01' },
+};
+
 export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
