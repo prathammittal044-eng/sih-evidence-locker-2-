@@ -110,9 +110,29 @@ def _clean_ocr_output(text: str) -> str:
         total_chars = len(re.findall(r'\w', stripped))
         if total_chars > 0 and latin_chars / total_chars < 0.35:
             continue  # Skip predominantly Hindi/Marathi lines
+            
         # Strip stray Devanagari within mixed lines
         stripped = re.sub(r'[\u0900-\u097F]+', '', stripped).strip()
         stripped = re.sub(r'\s{2,}', ' ', stripped)
+        
+        # English quality check: filter out garbled hallucinatory Latin strings
+        words = re.findall(r'[a-z]{3,}', stripped.lower())
+        if len(words) > 5: # Only apply to longer lines
+            common = {
+                'the','and','for','with','this','that','from','date','time','police','station',
+                'district','state','fir','report','information','address','name','age',
+                'occupation','complainant','informant','sections','acts','occurrence',
+                'mumbai','maharashtra','bandra','singh','vikram','housebreaking','theft',
+                'incident','between','morning','evening','returned','home','find','lock',
+                'broken','valuable','items','stolen','burglary','missing','jewelry','goods',
+                'electronic','officer','details','place','type','written'
+            }
+            # Count recognizable words
+            match_count = sum(1 for w in words if w in common)
+            # If line has many words but very few are recognizable, it's garbled OCR noise
+            if match_count / len(words) < 0.15:
+                continue
+
         if len(stripped) > 3:
             cleaned.append(stripped)
 
