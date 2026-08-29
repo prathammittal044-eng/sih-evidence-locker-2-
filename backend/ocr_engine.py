@@ -38,15 +38,11 @@ for _path in TESSERACT_CANDIDATES:
 if not OCR_AVAILABLE:
     print("[OCR] WARNING: Tesseract not found. OCR will be disabled.")
 
-# Use the custom tessdata directory which has both eng + hin models
-_CUSTOM_TESSDATA = r'C:\Users\prath\AppData\Local\tessdata'
-_TESSDATA_CONFIG = f'--tessdata-dir {_CUSTOM_TESSDATA}' if os.path.isdir(_CUSTOM_TESSDATA) else ''
-os.environ['TESSDATA_PREFIX'] = _CUSTOM_TESSDATA
-
-# Detect available languages
-_HIN_AVAILABLE = os.path.exists(os.path.join(_CUSTOM_TESSDATA, 'hin.traineddata'))
-_LANG = 'eng+hin' if _HIN_AVAILABLE else 'eng'
-print(f"[OCR] Custom tessdata: {_CUSTOM_TESSDATA} | Hindi: {_HIN_AVAILABLE} | Lang: {_LANG}")
+# Use eng-only from system Tesseract (reliable, no custom path needed).
+# The _clean_ocr_output filter handles Devanagari line stripping post-OCR.
+_TESSDATA_CONFIG = ''
+_LANG = 'eng'
+print(f"[OCR] Language: {_LANG}")
 
 
 # -------------------------------------------------------
@@ -94,9 +90,10 @@ def _preprocess_image(img: Image.Image) -> Image.Image:
 
 def _clean_ocr_output(text: str) -> str:
     """
-    Filter out obvious OCR noise:
-    - Lines that are just 1â€“2 characters
-    - Lines with only punctuation/symbols and no readable letters
+    Filter out obvious OCR noise and non-English dominant lines:
+    - Lines that are just 1-2 characters
+    - Lines with only punctuation/symbols
+    - Lines that are predominantly Devanagari (Hindi/Marathi) — these show as unreadable
     - Collapse excessive whitespace
     """
     lines = text.split('\n')
@@ -105,10 +102,19 @@ def _clean_ocr_output(text: str) -> str:
         stripped = line.strip()
         if len(stripped) <= 2:
             continue
-        # Skip lines with no alphanumeric content (English or Hindi Unicode)
-        if stripped and not re.search(r'[A-Za-z0-9\u0900-\u097F]', stripped):
+        # Skip lines with no alphanumeric content at all
+        if not re.search(r'[A-Za-z0-9\u0900-\u097F]', stripped):
             continue
-        cleaned.append(line)
+        # Filter lines that are mostly Devanagari (>60% non-Latin word chars)
+        latin_chars = len(re.findall(r'[A-Za-z0-9]', stripped))
+        total_chars = len(re.findall(r'\w', stripped))
+        if total_chars > 0 and latin_chars / total_chars < 0.35:
+            continue  # Skip predominantly Hindi/Marathi lines
+        # Strip stray Devanagari within mixed lines
+        stripped = re.sub(r'[\u0900-\u097F]+', '', stripped).strip()
+        stripped = re.sub(r'\s{2,}', ' ', stripped)
+        if len(stripped) > 3:
+            cleaned.append(stripped)
 
     result = re.sub(r'\n{3,}', '\n\n', '\n'.join(cleaned))
     return result.strip()
