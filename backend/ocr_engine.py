@@ -1,4 +1,4 @@
-﻿"""
+"""
 ocr_engine.py â€” OCR Text & Image Extraction Engine
 Uses pytesseract (Tesseract OCR) + Pillow for image processing.
 100% offline. No internet required after Tesseract is installed.
@@ -38,16 +38,14 @@ for _path in TESSERACT_CANDIDATES:
 if not OCR_AVAILABLE:
     print("[OCR] WARNING: Tesseract not found. OCR will be disabled.")
 
-# Check if Hindi language data is installed
-_HIN_AVAILABLE = False
-try:
-    langs = pytesseract.get_languages()
-    _HIN_AVAILABLE = 'hin' in langs
-    print(f"[OCR] Languages available: {langs}. Hindi: {_HIN_AVAILABLE}")
-except Exception:
-    pass
+# Use the custom tessdata directory which has both eng + hin models
+_CUSTOM_TESSDATA = r'C:\Users\prath\AppData\Local\tessdata'
+_TESSDATA_CONFIG = f'--tessdata-dir "{_CUSTOM_TESSDATA}"' if os.path.isdir(_CUSTOM_TESSDATA) else ''
 
+# Detect available languages
+_HIN_AVAILABLE = os.path.exists(os.path.join(_CUSTOM_TESSDATA, 'hin.traineddata'))
 _LANG = 'eng+hin' if _HIN_AVAILABLE else 'eng'
+print(f"[OCR] Custom tessdata: {_CUSTOM_TESSDATA} | Hindi: {_HIN_AVAILABLE} | Lang: {_LANG}")
 
 
 # -------------------------------------------------------
@@ -135,7 +133,7 @@ def ocr_image_bytes(image_bytes: bytes) -> str:
         # PSM 4 = single column of text (good for report pages)
         for psm in [6, 3, 4]:
             try:
-                config = f'--psm {psm} --oem 3 -c preserve_interword_spaces=1'
+                config = f'--psm {psm} --oem 3 -c preserve_interword_spaces=1 {_TESSDATA_CONFIG}'
                 text = pytesseract.image_to_string(img, lang=_LANG, config=config)
                 text = _clean_ocr_output(text)
                 if len(text) > len(best_text):
