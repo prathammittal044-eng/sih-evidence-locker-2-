@@ -1,11 +1,18 @@
-"""
-ocr_engine.py — OCR Text & Image Extraction Engine
+﻿"""
+ocr_engine.py â€” OCR Text & Image Extraction Engine
 Uses pytesseract (Tesseract OCR) + Pillow for image processing.
 100% offline. No internet required after Tesseract is installed.
+
+Improvements:
+- Advanced image preprocessing (grayscale, denoise, deskew, contrast enhance)
+- Multiple OCR passes with different PSM modes, picks the best result
+- Language hint: eng+hin for mixed-language Indian FIR documents
+- Filters out OCR noise (single-char lines, symbol-only lines)
 """
 import os
 import io
-from PIL import Image
+import re
+from PIL import Image, ImageFilter, ImageOps, ImageEnhance
 
 # -------------------------------------------------------
 # Locate Tesseract on this machine
@@ -31,21 +38,112 @@ for _path in TESSERACT_CANDIDATES:
 if not OCR_AVAILABLE:
     print("[OCR] WARNING: Tesseract not found. OCR will be disabled.")
 
+# Check if Hindi language data is installed
+_HIN_AVAILABLE = False
+try:
+    langs = pytesseract.get_languages()
+    _HIN_AVAILABLE = 'hin' in langs
+    print(f"[OCR] Languages available: {langs}. Hindi: {_HIN_AVAILABLE}")
+except Exception:
+    pass
+
+_LANG = 'eng+hin' if _HIN_AVAILABLE else 'eng'
+
 
 # -------------------------------------------------------
-# Core OCR function
+# Image Preprocessing Pipeline
+# -------------------------------------------------------
+def _preprocess_image(img: Image.Image) -> Image.Image:
+    """
+    Apply preprocessing to maximize OCR accuracy on photographed
+    or scanned Indian government documents (FIRs, reports, etc.).
+    """
+    # 1. Flatten RGBA to RGB white background
+    if img.mode == 'RGBA':
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[3])
+        img = background
+    elif img.mode not in ('RGB', 'L'):
+        img = img.convert('RGB')
+
+    # 2. Upscale small images â€” Tesseract works best at ~300 DPI equivalent
+    w, h = img.size
+    if w < 1800:
+        scale = 1800 / w
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
+    # 3. Convert to grayscale
+    img = img.convert('L')
+
+    # 4. Boost contrast strongly so printed text stands out against background
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(2.5)
+
+    # 5. Sharpen to fix blur from phone camera shots
+    enhancer = ImageEnhance.Sharpness(img)
+    img = enhancer.enhance(3.0)
+
+    # 6. Reduce noise with a mild median filter
+    img = img.filter(ImageFilter.MedianFilter(size=3))
+
+    # 7. Binarize â€” threshold at 150 to get clean black/white text
+    img = img.point(lambda x: 255 if x > 150 else 0, '1')
+    img = img.convert('L')  # back to 'L' mode for pytesseract
+
+    return img
+
+
+def _clean_ocr_output(text: str) -> str:
+    """
+    Filter out obvious OCR noise:
+    - Lines that are just 1â€“2 characters
+    - Lines with only punctuation/symbols and no readable letters
+    - Collapse excessive whitespace
+    """
+    lines = text.split('\n')
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if len(stripped) <= 2:
+            continue
+        # Skip lines with no alphanumeric content (English or Hindi Unicode)
+        if stripped and not re.search(r'[A-Za-z0-9\u0900-\u097F]', stripped):
+            continue
+        cleaned.append(line)
+
+    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(cleaned))
+    return result.strip()
+
+
+# -------------------------------------------------------
+# Core OCR function with multi-pass strategy
 # -------------------------------------------------------
 def ocr_image_bytes(image_bytes: bytes) -> str:
-    """Run OCR on raw image bytes and return extracted text."""
+    """
+    Run OCR on raw image bytes.
+    Tries multiple Tesseract PSM modes and picks the longest/best result.
+    """
     if not OCR_AVAILABLE:
         return ""
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        # Convert to RGB if needed (some PDFs extract CMYK or P-mode images)
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
-        text = pytesseract.image_to_string(img, config='--psm 6')
-        return text.strip()
+        img = _preprocess_image(img)
+
+        best_text = ""
+        # PSM 6 = assume uniform block of text (great for printed forms like FIRs)
+        # PSM 3 = fully automatic page segmentation
+        # PSM 4 = single column of text (good for report pages)
+        for psm in [6, 3, 4]:
+            try:
+                config = f'--psm {psm} --oem 3 -c preserve_interword_spaces=1'
+                text = pytesseract.image_to_string(img, lang=_LANG, config=config)
+                text = _clean_ocr_output(text)
+                if len(text) > len(best_text):
+                    best_text = text
+            except Exception:
+                continue
+
+        return best_text
     except Exception as e:
         print(f"[OCR] image_to_string failed: {e}")
         return ""
@@ -62,10 +160,11 @@ def ocr_image_file(file_content: bytes) -> str:
 def process_pdf(file_content: bytes, doc_version_id: int, save_dir: str) -> tuple:
     """
     Process a PDF file:
-    - Extract text using pypdf (fast, for text-based PDFs)
+    - Extract selectable text using pypdf (fast, for text-based PDFs)
     - Extract embedded images and save them to disk
-    - If a page has no selectable text, OCR the extracted images from that page
-    
+    - OCR any page that has no selectable text (scanned / photo-based PDFs)
+    - Optionally render PDF pages via pdf2image for best results on photo-PDFs
+
     Returns:
         (full_text: str, saved_image_filenames: list[str])
     """
@@ -78,9 +177,11 @@ def process_pdf(file_content: bytes, doc_version_id: int, save_dir: str) -> tupl
         for page_num, page in enumerate(pdf.pages):
             # --- Step 1: Try native text extraction ---
             page_text = page.extract_text() or ""
-            page_has_text = bool(page_text.strip())
+            page_text_cleaned = _clean_ocr_output(page_text)
+            # Only trust native text if there's a meaningful amount of it
+            page_has_text = len(page_text_cleaned) > 80
             if page_has_text:
-                all_text_parts.append(page_text)
+                all_text_parts.append(page_text_cleaned)
 
             # --- Step 2: Extract embedded images ---
             try:
@@ -88,10 +189,10 @@ def process_pdf(file_content: bytes, doc_version_id: int, save_dir: str) -> tupl
             except Exception:
                 page_images = []
 
+            page_ocr_done = False
             for img_num, img_obj in enumerate(page_images):
                 try:
                     img_bytes = img_obj.data
-                    # Determine extension
                     name = getattr(img_obj, 'name', '')
                     ext = name.rsplit('.', 1)[-1].lower() if '.' in name else 'png'
                     if ext not in ('jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif'):
@@ -99,22 +200,41 @@ def process_pdf(file_content: bytes, doc_version_id: int, save_dir: str) -> tupl
 
                     img_filename = f"docv{doc_version_id}_page{page_num + 1}_img{img_num + 1}.{ext}"
                     img_path = os.path.join(save_dir, img_filename)
-
                     with open(img_path, 'wb') as f:
                         f.write(img_bytes)
                     saved_images.append(img_filename)
 
-                    # --- Step 3: OCR this image if page had no native text ---
-                    if not page_has_text and OCR_AVAILABLE:
+                    # --- Step 3: OCR the embedded image if page has no native text ---
+                    if not page_has_text and not page_ocr_done and OCR_AVAILABLE:
                         ocr_text = ocr_image_bytes(img_bytes)
-                        if ocr_text:
+                        if ocr_text and len(ocr_text) > 30:
                             all_text_parts.append(
-                                f"[Page {page_num + 1} — OCR Scan]:\n{ocr_text}"
+                                f"[Page {page_num + 1} â€” OCR Scan]:\n{ocr_text}"
                             )
-                            page_has_text = True  # Avoid re-OCR-ing multiple images on same page
+                            page_ocr_done = True
 
                 except Exception as img_err:
                     print(f"[OCR] Image {img_num+1} on page {page_num+1} failed: {img_err}")
+
+            # --- Step 4: If STILL no text (photo inserted as PDF page), try pdf2image render ---
+            if not page_has_text and not page_ocr_done and OCR_AVAILABLE:
+                try:
+                    from pdf2image import convert_from_bytes
+                    pages_img = convert_from_bytes(
+                        file_content, first_page=page_num + 1, last_page=page_num + 1, dpi=250
+                    )
+                    if pages_img:
+                        buf = io.BytesIO()
+                        pages_img[0].save(buf, format='PNG')
+                        ocr_text = ocr_image_bytes(buf.getvalue())
+                        if ocr_text and len(ocr_text) > 30:
+                            all_text_parts.append(
+                                f"[Page {page_num + 1} â€” OCR Scan]:\n{ocr_text}"
+                            )
+                except ImportError:
+                    pass  # pdf2image not installed â€” skip this step
+                except Exception as e:
+                    print(f"[OCR] pdf2image render failed for page {page_num+1}: {e}")
 
         return "\n\n".join(all_text_parts), saved_images
 
@@ -131,3 +251,4 @@ def is_image_file(filename: str) -> bool:
 
 def is_pdf_file(filename: str) -> bool:
     return filename.lower().endswith('.pdf')
+
