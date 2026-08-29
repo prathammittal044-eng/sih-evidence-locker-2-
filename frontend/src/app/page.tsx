@@ -25,29 +25,28 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState(1);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const USERS: Record<number, { role: string }> = {
-    1: { role: 'Officer' },
-    2: { role: 'Reviewer' },
-    3: { role: 'Judge' },
-  };
-  const canCreateCase = USERS[currentUserId]?.role === 'Officer';
+  const canCreateCase = currentUser?.role === 'Officer';
 
   useEffect(() => {
+    // Auth guard
+    const token = localStorage.getItem('sih_token');
+    const userRaw = localStorage.getItem('sih_user');
+    if (!token || !userRaw) { window.location.href = '/login'; return; }
+    setCurrentUser(JSON.parse(userRaw));
     fetchCases();
-    const stored = localStorage.getItem('sih_user_id');
-    if (stored) setCurrentUserId(parseInt(stored));
-    const handler = () => {
-      const newId = localStorage.getItem('sih_user_id');
-      if (newId) setCurrentUserId(parseInt(newId));
-    };
-    window.addEventListener('userChange', handler);
-    return () => window.removeEventListener('userChange', handler);
   }, []);
 
+  const getHeaders = () => {
+    const token = localStorage.getItem('sih_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const fetchCases = () => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/`)
+    const token = localStorage.getItem('sih_token');
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then(res => res.json())
       .then(data => setCases(data))
       .catch(err => console.error('Error fetching cases', err));
@@ -83,7 +82,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getHeaders() },
         body: JSON.stringify(payload),
       });
       if (res.ok) {

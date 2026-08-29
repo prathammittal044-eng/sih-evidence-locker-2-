@@ -3,18 +3,16 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { ShieldAlert, Activity, FileText, Upload, RefreshCw, Eye } from 'lucide-react';
 
-const USERS: Record<number, { name: string; role: string; badge: string }> = {
-  1: { name: 'Sub-Inspector Sharma', role: 'Officer',  badge: '9482A' },
-  2: { name: 'Chief Inspector Verma', role: 'Reviewer', badge: '1109X' },
-  3: { name: 'Hon. Judge Patel',      role: 'Judge',    badge: 'JDG-01' },
-};
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/audit-logs/`)
+    const token = localStorage.getItem('sih_token');
+    if (!token) { window.location.href = '/login'; return; }
+    fetch(`${API}/audit-logs/`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => setLogs(data))
       .catch(err => console.error(err))

@@ -35,17 +35,79 @@ ROLE_PERMISSIONS = {
     "Judge":    {"can_upload": False, "can_seal": True,  "can_verify": True},
 }
 
+# --- JWT Config ---
+from jose import JWTError, jwt
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import hashlib as _hashlib
+
+SECRET_KEY  = "SIH2026-EVIDENCE-LOCKER-SECRET-XK9Z"
+ALGORITHM   = "HS256"
+TOKEN_HOURS = 8
+bearer_scheme = HTTPBearer(auto_error=False)
+
+def _hash_pw(pw: str) -> str:
+    return _hashlib.sha256((pw + SECRET_KEY).encode()).hexdigest()
+
+def _verify_pw(plain: str, hashed: str) -> bool:
+    return _hash_pw(plain) == hashed
+
 USERS_STATIC = {
-    1: {"name": "Sub-Inspector Sharma", "role": "Officer",  "badge": "9482A"},
-    2: {"name": "Chief Inspector Verma", "role": "Reviewer", "badge": "1109X"},
-    3: {"name": "Hon. Judge Patel",      "role": "Judge",    "badge": "JDG-01"},
+    1: {
+        "name": "Sub-Inspector Sharma", "role": "Officer",
+        "badge": "9482A", "username": "sharma",
+        "hashed_password": _hash_pw("Officer@123"),
+        "department": "Cyber Crime Unit, Delhi Police",
+    },
+    2: {
+        "name": "Chief Inspector Verma", "role": "Reviewer",
+        "badge": "1109X", "username": "verma",
+        "hashed_password": _hash_pw("Reviewer@123"),
+        "department": "Special Investigation Branch",
+    },
+    3: {
+        "name": "Hon. Judge Patel", "role": "Judge",
+        "badge": "JDG-01", "username": "judge1",
+        "hashed_password": _hash_pw("Judge@123"),
+        "department": "Sessions Court, District Court",
+    },
 }
 
 def get_user_info(user_id: int) -> dict:
-    return USERS_STATIC.get(user_id, {"name": "Unknown", "role": "Unknown", "badge": "N/A"})
+    u = USERS_STATIC.get(user_id, {})
+    return {
+        "name": u.get("name", "Unknown"), "role": u.get("role", "Unknown"),
+        "badge": u.get("badge", "N/A"), "department": u.get("department", "")
+    }
 
 def get_user_role(user_id: int) -> str:
     return get_user_info(user_id)["role"]
+
+def create_access_token(user_id: int) -> str:
+    from datetime import timedelta
+    u = USERS_STATIC[user_id]
+    payload = {
+        "sub": str(user_id),
+        "name": u["name"], "role": u["role"],
+        "badge": u["badge"], "department": u["department"],
+        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_HOURS),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return {}
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated. Please log in.")
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired session. Please log in again.")
+    return {"id": int(payload["sub"]), "name": payload["name"],
+            "role": payload["role"], "badge": payload["badge"]}
+
 
 # -------------------------------------------------------
 # Run migrations for new columns (safe to call every start)
@@ -174,6 +236,41 @@ def extract_and_save_images(file_content: bytes, filename: str, db_version_id: i
         db.commit()
 
     return saved
+
+# -------------------------------------------------------
+# Auth Endpoints — Login & Me
+# -------------------------------------------------------
+@app.post("/auth/login/")
+def login(username: str = Form(...), password: str = Form(...)):
+    """Authenticate user and return a JWT token."""
+    # Find user by username
+    matched_id = None
+    for uid, u in USERS_STATIC.items():
+        if u["username"] == username.strip().lower():
+            matched_id = uid
+            break
+
+    if matched_id is None or not _verify_pw(password, USERS_STATIC[matched_id]["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    token = create_access_token(matched_id)
+    u = USERS_STATIC[matched_id]
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": matched_id,
+            "name": u["name"],
+            "role": u["role"],
+            "badge": u["badge"],
+            "department": u["department"],
+        }
+    }
+
+@app.get("/auth/me/")
+def get_me(current_user: dict = Depends(get_current_user)):
+    """Return current authenticated user's info."""
+    return current_user
 
 # -------------------------------------------------------
 # File serving

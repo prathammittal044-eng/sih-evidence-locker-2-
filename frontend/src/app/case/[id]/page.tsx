@@ -21,29 +21,34 @@ export default function CaseDetails() {
   const { id } = useParams();
   const [caseData, setCaseData]       = useState<any>(null);
   const [loading, setLoading]         = useState(true);
-  const [currentUserId, setCurrentUserId] = useState(1);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [sealing, setSealing]         = useState(false);
   const [docType, setDocType]         = useState('FIR');
   const [expandedOCR, setExpandedOCR] = useState<Record<number, boolean>>({});
   const [expandedImgs, setExpandedImgs] = useState<Record<number, boolean>>({});
   const [versionImages, setVersionImages] = useState<Record<number, any[]>>({});
 
-  const currentUser = USERS[currentUserId] || USERS[1];
-  const canUpload   = currentUser.role === 'Officer';
-  const canSeal     = currentUser.role === 'Judge';
+  const canUpload = currentUser?.role === 'Officer';
+  const canSeal   = currentUser?.role === 'Judge';
+  const currentUserId = currentUser?.id || 1;
+
+  const getHeaders = () => {
+    const token = localStorage.getItem('sih_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const fetchCase = async () => {
     try {
-      const res = await fetch(`${API}/cases/${id}`);
+      const res = await fetch(`${API}/cases/${id}`, { headers: getHeaders() });
       setCaseData(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
   const fetchImages = async (versionId: number) => {
-    if (versionImages[versionId] !== undefined) return; // already loaded
+    if (versionImages[versionId] !== undefined) return;
     try {
-      const res = await fetch(`${API}/versions/${versionId}/images/`);
+      const res = await fetch(`${API}/versions/${versionId}/images/`, { headers: getHeaders() });
       const data = await res.json();
       setVersionImages(prev => ({ ...prev, [versionId]: data }));
     } catch { setVersionImages(prev => ({ ...prev, [versionId]: [] })); }
@@ -58,17 +63,12 @@ export default function CaseDetails() {
     setExpandedImgs(prev => ({ ...prev, [versionId]: !prev[versionId] }));
   };
 
-
   useEffect(() => {
+    const token = localStorage.getItem('sih_token');
+    const userRaw = localStorage.getItem('sih_user');
+    if (!token || !userRaw) { window.location.href = '/login'; return; }
+    setCurrentUser(JSON.parse(userRaw));
     fetchCase();
-    const stored = localStorage.getItem('sih_user_id');
-    if (stored) setCurrentUserId(parseInt(stored));
-    const handler = () => {
-      const newId = localStorage.getItem('sih_user_id');
-      if (newId) setCurrentUserId(parseInt(newId));
-    };
-    window.addEventListener('userChange', handler);
-    return () => window.removeEventListener('userChange', handler);
   }, [id]);
 
   const handleUpload = async (e: any) => {
@@ -77,7 +77,7 @@ export default function CaseDetails() {
     const formData = new FormData(e.target);
     formData.append('user_id', currentUserId.toString());
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}/documents/`, { method: 'POST', body: formData });
+      const res = await fetch(`${API}/cases/${id}/documents/`, { method: 'POST', body: formData, headers: getHeaders() });
       const data = await res.json();
       if (res.ok) { alert('Document securely uploaded and sealed!'); fetchCase(); e.target.reset(); }
       else        { alert(`Error: ${data.detail}`); }
@@ -86,7 +86,7 @@ export default function CaseDetails() {
 
   const handleVerify = async (document_id: number) => {
     try {
-      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/documents/${document_id}/verify/`);
+      const res  = await fetch(`${API}/documents/${document_id}/verify/`, { headers: getHeaders() });
       const data = await res.json();
       let msg = 'CRYPTOGRAPHIC INTEGRITY CHECK\n' + '─'.repeat(40) + '\n\n';
       data.integrity_checks.forEach((c: any) => {
@@ -112,9 +112,9 @@ export default function CaseDetails() {
     try {
       const formData = new FormData();
       formData.append('user_id', currentUserId.toString());
-      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/cases/${id}/seal/`, { method: 'POST', body: formData });
+      const res  = await fetch(`${API}/cases/${id}/seal/`, { method: 'POST', body: formData, headers: getHeaders() });
       const data = await res.json();
-      if (res.ok) { alert(`✅ ${data.message}`); fetchCase(); }
+      if (res.ok) { alert(`Case sealed successfully.`); fetchCase(); }
       else        { alert(`Error: ${data.detail}`); }
     } catch { alert('Network error.'); }
     finally { setSealing(false); }

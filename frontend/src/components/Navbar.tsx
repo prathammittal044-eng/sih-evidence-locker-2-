@@ -1,64 +1,118 @@
 'use client';
 import Link from 'next/link';
-import { ShieldCheck, UserCircle, ArrowLeft } from 'lucide-react';
+import { Shield, LogOut, ArrowLeft, ClipboardList, User, BadgeCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { getUser, logout, SIHUser } from '@/lib/auth';
 
-const USERS = [
-  { id: 1, name: 'Sub-Inspector Sharma', role: 'Officer', badge: '9482A' },
-  { id: 2, name: 'Chief Inspector Verma', role: 'Reviewer', badge: '1109X' },
-  { id: 3, name: 'Hon. Judge Patel', role: 'Judge', badge: 'JDG-01' },
-];
+const ROLE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  Officer:  { bg: 'bg-blue-700',    text: 'text-blue-100',   border: 'border-blue-500' },
+  Reviewer: { bg: 'bg-emerald-700', text: 'text-emerald-100', border: 'border-emerald-500' },
+  Judge:    { bg: 'bg-purple-800',  text: 'text-purple-100',  border: 'border-purple-500' },
+};
 
-export default function Navbar({ showBack = false, title = "SIH SECURE EVIDENCE LOCKER" }) {
-  const [currentUser, setCurrentUser] = useState(USERS[0]);
+export default function Navbar({ showBack = false }: { showBack?: boolean }) {
+  const [user, setUser] = useState<SIHUser | null>(null);
 
   useEffect(() => {
-    const savedId = localStorage.getItem('sih_user_id');
-    if (savedId) {
-      const user = USERS.find(u => u.id === parseInt(savedId)) || USERS[0];
-      setCurrentUser(user);
-    }
+    setUser(getUser());
   }, []);
 
-  const handleUserChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const user = USERS.find(u => u.id === parseInt(e.target.value)) || USERS[0];
-    setCurrentUser(user);
-    localStorage.setItem('sih_user_id', user.id.toString());
-    // Dispatch event so other components know user changed
-    window.dispatchEvent(new Event('userChange'));
-  };
+  const roleStyle = user ? (ROLE_STYLES[user.role] || ROLE_STYLES.Officer) : ROLE_STYLES.Officer;
 
   return (
-    <nav className="bg-[#0f172a] text-white p-4 shadow-lg flex justify-between items-center border-b-4 border-blue-600">
-      <div className="flex items-center gap-3">
-        {showBack ? (
-          <Link href="/" className="flex items-center gap-1 text-slate-300 hover:text-white transition-colors bg-slate-800 px-3 py-1.5 rounded-md text-sm font-bold tracking-wide mr-2">
-            <ArrowLeft className="w-4 h-4" /> DASHBOARD
-          </Link>
-        ) : (
-          <ShieldCheck className="w-8 h-8 text-blue-400" />
-        )}
-        <h1 className="text-xl font-bold tracking-widest text-slate-100 hidden sm:block">{title}</h1>
+    <header>
+      {/* ── TOP SECURITY STRIP ── */}
+      <div className="bg-red-700 text-white text-center py-1 text-xs font-bold tracking-widest uppercase">
+        RESTRICTED — OFFICIAL USE ONLY — AUTHORISED PERSONNEL — GOVERNMENT OF INDIA
       </div>
-      
-      <div className="flex gap-4 items-center">
-        <Link href="/audit" className="hidden md:flex items-center gap-1 bg-blue-800 hover:bg-blue-700 border border-blue-600 px-3 py-1.5 rounded text-sm font-bold transition-colors mr-2">
-          System Audit Log
-        </Link>
-        <div className="flex flex-col items-end">
-          <select 
-            value={currentUser.id} 
-            onChange={handleUserChange}
-            className="bg-slate-800 text-white text-sm font-bold p-1 rounded border border-slate-600 outline-none cursor-pointer"
-          >
-            {USERS.map(u => (
-              <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-            ))}
-          </select>
-          <span className="text-xs text-blue-400 font-mono mt-1">Badge: {currentUser.badge}</span>
+
+      {/* ── GOVERNMENT IDENTITY HEADER ── */}
+      <div style={{ background: '#1a3a6b' }} className="text-white">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          {/* Left: Emblem + Title */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow">
+              <span className="text-xl">🔰</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest text-blue-300 uppercase leading-none">
+                भारत सरकार · Government of India
+              </p>
+              <p className="text-sm font-black tracking-wide leading-snug">Ministry of Home Affairs</p>
+              <p className="text-[10px] text-blue-300 leading-none hidden sm:block">
+                Digital Evidence Management &amp; Secure Locker System
+              </p>
+            </div>
+          </div>
+
+          {/* Right: NIC badge */}
+          <div className="hidden md:flex items-center gap-2 text-blue-300 text-xs">
+            <Shield className="w-4 h-4" />
+            <span className="font-bold tracking-wider">NIC · ISO 27001 Certified</span>
+          </div>
         </div>
-        <UserCircle className="w-10 h-10 text-slate-300 hidden sm:block" />
+        {/* Tricolour strip */}
+        <div className="flex h-1">
+          <div className="flex-1" style={{ background: '#FF9933' }} />
+          <div className="flex-1 bg-white" />
+          <div className="flex-1" style={{ background: '#138808' }} />
+        </div>
       </div>
-    </nav>
+
+      {/* ── MAIN NAV BAR ── */}
+      <nav className="bg-[#0f2744] text-white shadow-lg border-b-2 border-blue-700">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+
+          {/* Left side */}
+          <div className="flex items-center gap-3">
+            {showBack ? (
+              <Link href="/"
+                className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 border border-blue-700 px-3 py-1.5 rounded text-xs font-bold tracking-wider transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" /> DASHBOARD
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-400" />
+                <span className="text-sm font-black tracking-widest text-slate-100 hidden sm:block">
+                  EVIDENCE LOCKER
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Right side: audit + user info + logout */}
+          <div className="flex items-center gap-3">
+            <Link href="/audit"
+              className="hidden md:flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 border border-blue-700 px-3 py-1.5 rounded text-xs font-bold tracking-wider transition-colors">
+              <ClipboardList className="w-3.5 h-3.5" /> Audit Log
+            </Link>
+
+            {user && (
+              <div className={`flex items-center gap-2 ${roleStyle.bg} border ${roleStyle.border} rounded-lg px-3 py-1.5`}>
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div className="hidden sm:block">
+                  <p className={`text-xs font-black ${roleStyle.text} leading-none`}>{user.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <BadgeCheck className={`w-3 h-3 ${roleStyle.text} opacity-80`} />
+                    <span className={`text-[10px] ${roleStyle.text} opacity-80 font-mono`}>
+                      {user.role} · Badge {user.badge}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button onClick={logout}
+              title="Sign Out"
+              className="flex items-center gap-1.5 bg-red-800 hover:bg-red-700 border border-red-600 px-3 py-1.5 rounded text-xs font-bold tracking-wider transition-colors">
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">SIGN OUT</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+    </header>
   );
 }
