@@ -1,5 +1,5 @@
-﻿"""
-nlp_engine.py â€” AI Document Analysis Engine
+"""
+nlp_engine.py — AI Document Analysis Engine
 Primary: Gemini 2.0 Flash Vision (reads document images directly, perfect for bilingual FIRs)
 Fallback: Offline spaCy + TextRank (no API required)
 """
@@ -12,26 +12,28 @@ from typing import List, Dict, Any
 import networkx as nx
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the backend directory (works regardless of cwd)
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_backend_dir, ".env"))
 
 # -------------------------------------------------------
-# Gemini Vision Setup
+# Gemini Vision Setup — using new google.genai SDK
 # -------------------------------------------------------
 GEMINI_AVAILABLE = False
-_gemini_model = None
+_gemini_client = None
 
 try:
-    import google.generativeai as genai
-    _api_key = os.getenv("GEMINI_API_KEY", "")
+    from google import genai
+    from google.genai import types
+    _api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if _api_key:
-        genai.configure(api_key=_api_key)
-        _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+        _gemini_client = genai.Client(api_key=_api_key)
         GEMINI_AVAILABLE = True
-        print(f"[NLP] Gemini Vision ready (gemini-2.0-flash)")
+        print(f"[NLP] Gemini Vision ready (google.genai SDK, gemini-3.6-flash)")
     else:
-        print("[NLP] GEMINI_API_KEY not set â€” falling back to offline mode")
+        print("[NLP] GEMINI_API_KEY not set — falling back to offline mode")
 except Exception as e:
-    print(f"[NLP] Gemini init failed: {e} â€” falling back to offline mode")
+    print(f"[NLP] Gemini init failed: {e} — falling back to offline mode")
 
 # -------------------------------------------------------
 # Offline spaCy Setup (fallback)
@@ -52,9 +54,10 @@ except Exception as e:
 def analyze_with_gemini(text: str, image_paths: List[str] = None) -> Dict[str, Any]:
     """
     Send document images directly to Gemini Vision for analysis.
-    Falls back to text-only if no images are provided.
+    Uses the new google.genai SDK.
     """
     from PIL import Image as PILImage
+    import base64
 
     prompt = """You are an AI assistant analyzing an Indian government legal document (FIR - First Information Report).
 
@@ -80,31 +83,36 @@ ENTITIES:
 <valid JSON object with PERSON, GPE, ORG, DATE arrays>
 """
 
-    parts = [prompt]
+    contents = [prompt]
 
-    # Attach images if available
+    # Attach images using the new SDK format
     images_added = 0
     if image_paths:
-        for img_path in image_paths[:3]:  # Max 3 images
+        for img_path in image_paths[:3]:
             if os.path.exists(img_path):
                 try:
-                    img = PILImage.open(img_path)
-                    if img.mode not in ('RGB', 'L'):
-                        img = img.convert('RGB')
-                    parts.append(img)
+                    with open(img_path, "rb") as f:
+                        img_bytes = f.read()
+                    # Detect mime type
+                    ext = img_path.lower().rsplit('.', 1)[-1]
+                    mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+                    from google.genai import types
+                    contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
                     images_added += 1
                 except Exception as e:
                     print(f"[NLP] Could not load image {img_path}: {e}")
 
-    # If no images, use text as context
+    # Fallback to text if no images
     if images_added == 0 and text.strip():
-        parts.append(f"\nDocument text (OCR extracted):\n{text[:3000]}")
+        contents.append(f"\nDocument text (OCR extracted):\n{text[:3000]}")
 
     try:
-        response = _gemini_model.generate_content(parts)
+        response = _gemini_client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=contents
+        )
         raw = response.text.strip()
 
-        # Parse SUMMARY
         summary = ""
         entities = {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
 
@@ -112,10 +120,7 @@ ENTITIES:
             summary_part = raw.split("ENTITIES:")[0].replace("SUMMARY:", "").strip()
             entities_part = raw.split("ENTITIES:")[1].strip()
             summary = summary_part
-
-            # Parse JSON entities block
             try:
-                # Extract just the JSON object
                 json_match = re.search(r'\{.*\}', entities_part, re.DOTALL)
                 if json_match:
                     parsed = json.loads(json_match.group())
@@ -125,7 +130,7 @@ ENTITIES:
             except Exception as je:
                 print(f"[NLP] Entity JSON parse error: {je}")
         else:
-            summary = raw  # Use full response as summary if format unexpected
+            summary = raw
 
         return {"summary": summary, "entities": entities, "engine": "gemini-vision"}
 
@@ -250,5 +255,3 @@ def analyze_document(text: str, image_paths: List[str] = None) -> Dict[str, Any]
     return _offline_analyze(text)
 
 
-NLP_AVAILABLE = False
-try:
