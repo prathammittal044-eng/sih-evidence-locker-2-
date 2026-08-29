@@ -5,7 +5,8 @@ import Link from 'next/link';
 import {
   ShieldCheck, UploadCloud, FileText, History, CheckCircle, RefreshCw,
   FileLock2, Download, CheckCircle2, Lock, AlertTriangle, FileDown, Shield,
-  ScanText, Image as ImageIcon, ChevronDown, ChevronUp, Eye
+  ScanText, Image as ImageIcon, ChevronDown, ChevronUp, Eye,
+  BrainCircuit, Sparkles, UserCircle, Building2, Map, Calendar
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 
@@ -26,6 +27,7 @@ export default function CaseDetails() {
   const [docType, setDocType]         = useState('FIR');
   const [expandedOCR, setExpandedOCR] = useState<Record<number, boolean>>({});
   const [expandedImgs, setExpandedImgs] = useState<Record<number, boolean>>({});
+  const [expandedAI, setExpandedAI] = useState<Record<number, boolean>>({});
   const [versionImages, setVersionImages] = useState<Record<number, any[]>>({});
 
   const canUpload = currentUser?.role === 'Officer';
@@ -61,6 +63,10 @@ export default function CaseDetails() {
   const toggleImgs = (versionId: number) => {
     if (!expandedImgs[versionId]) fetchImages(versionId);
     setExpandedImgs(prev => ({ ...prev, [versionId]: !prev[versionId] }));
+  };
+
+  const toggleAI = (versionId: number) => {
+    setExpandedAI(prev => ({ ...prev, [versionId]: !prev[versionId] }));
   };
 
   useEffect(() => {
@@ -472,6 +478,92 @@ export default function CaseDetails() {
                                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">SHA-256 Integrity Hash</span>
                                             </div>
                                             <p className="text-xs font-mono text-slate-700 break-all bg-white p-2 rounded border border-slate-100">{v.file_hash}</p>
+                                          </div>
+
+                                          {/* ── AI NLP INSIGHTS ── */}
+                                          <div className="mt-3 border border-emerald-200 rounded-lg overflow-hidden">
+                                            <button
+                                              onClick={() => toggleAI(v.id)}
+                                              className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 transition-colors text-left"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <BrainCircuit className="w-4 h-4 text-emerald-600" />
+                                                <span className="text-sm font-bold text-emerald-800">AI Document Analysis</span>
+                                                {(v.ai_summary || v.entities) && (
+                                                  <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                                    <Sparkles className="w-3 h-3" /> Auto-Generated
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {expandedAI[v.id] ? <ChevronUp className="w-4 h-4 text-emerald-500" /> : <ChevronDown className="w-4 h-4 text-emerald-500" />}
+                                            </button>
+                                            {expandedAI[v.id] && (
+                                              <div className="p-4 bg-white border-t border-emerald-100 space-y-4">
+                                                {!v.ai_summary && !v.entities ? (
+                                                  <div className="text-center py-4 text-slate-400">
+                                                    <BrainCircuit className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                                    <p className="text-sm">No AI insights generated for this document.</p>
+                                                  </div>
+                                                ) : (
+                                                  <>
+                                                    {/* Auto Summary */}
+                                                    {v.ai_summary && (
+                                                      <div>
+                                                        <h5 className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-2 border-b border-emerald-100 pb-1">Executive Summary</h5>
+                                                        <p className="text-sm text-slate-700 leading-relaxed bg-emerald-50/50 p-3 rounded-lg border border-emerald-100 italic">
+                                                          {v.ai_summary}
+                                                        </p>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {/* Extracted Entities */}
+                                                    {v.entities && (
+                                                      <div>
+                                                        <h5 className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-3 border-b border-emerald-100 pb-1">Extracted Entities</h5>
+                                                        <div className="space-y-3">
+                                                          {(() => {
+                                                            try {
+                                                              const ents = JSON.parse(v.entities);
+                                                              if (Object.values(ents).every((arr: any) => arr.length === 0)) {
+                                                                return <p className="text-xs text-slate-500">No specific entities detected.</p>;
+                                                              }
+                                                              return (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                  {ents.PERSON?.length > 0 && (
+                                                                    <div>
+                                                                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-1.5"><UserCircle className="w-3.5 h-3.5"/> People</div>
+                                                                      <div className="flex flex-wrap gap-1">{ents.PERSON.map((e: string, i: number) => <span key={i} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">{e}</span>)}</div>
+                                                                    </div>
+                                                                  )}
+                                                                  {ents.GPE?.length > 0 && (
+                                                                    <div>
+                                                                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-1.5"><Map className="w-3.5 h-3.5"/> Locations</div>
+                                                                      <div className="flex flex-wrap gap-1">{ents.GPE.map((e: string, i: number) => <span key={i} className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded">{e}</span>)}</div>
+                                                                    </div>
+                                                                  )}
+                                                                  {ents.ORG?.length > 0 && (
+                                                                    <div>
+                                                                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-1.5"><Building2 className="w-3.5 h-3.5"/> Organizations</div>
+                                                                      <div className="flex flex-wrap gap-1">{ents.ORG.map((e: string, i: number) => <span key={i} className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded">{e}</span>)}</div>
+                                                                    </div>
+                                                                  )}
+                                                                  {ents.DATE?.length > 0 && (
+                                                                    <div>
+                                                                      <div className="flex items-center gap-1 text-xs font-bold text-slate-600 mb-1.5"><Calendar className="w-3.5 h-3.5"/> Dates</div>
+                                                                      <div className="flex flex-wrap gap-1">{ents.DATE.map((e: string, i: number) => <span key={i} className="text-xs bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded">{e}</span>)}</div>
+                                                                    </div>
+                                                                  )}
+                                                                </div>
+                                                              );
+                                                            } catch(e) { return null; }
+                                                          })()}
+                                                        </div>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
 
                                           {/* ── OCR TEXT PREVIEW ── */}

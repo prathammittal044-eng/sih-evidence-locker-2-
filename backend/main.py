@@ -132,6 +132,16 @@ def run_migrations():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE document_versions ADD COLUMN ai_summary TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE document_versions ADD COLUMN entities TEXT"))
+            conn.commit()
+        except Exception:
+            pass
         # New: document images table (create via metadata if not exists)
         try:
             conn.execute(text("""
@@ -467,6 +477,19 @@ def upload_document(
     object_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, object_name)
     extracted_text = extract_text(file_content, file.filename)
+    
+    # --- AI NLP Insights (Summary + Entities) ---
+    ai_summary = ""
+    entities_json = "{}"
+    try:
+        import nlp_engine
+        import json
+        if extracted_text:
+            nlp_data = nlp_engine.analyze_document(extracted_text)
+            ai_summary = nlp_data.get("summary", "")
+            entities_json = json.dumps(nlp_data.get("entities", {}))
+    except Exception as e:
+        print(f"NLP Engine skipped: {e}")
 
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
@@ -484,7 +507,9 @@ def upload_document(
         document_id=db_doc.id, version_number=1,
         file_path=object_name, file_hash=file_hash,
         status="Active", uploaded_by=user_id,
-        extracted_text=extracted_text
+        extracted_text=extracted_text,
+        ai_summary=ai_summary,
+        entities=entities_json
     )
     db.add(db_version)
 
@@ -552,6 +577,19 @@ def update_document(
     file_path = os.path.join(UPLOAD_DIR, object_name)
     extracted_text = extract_text(file_content, file.filename)
 
+    # --- AI NLP Insights (Summary + Entities) ---
+    ai_summary = ""
+    entities_json = "{}"
+    try:
+        import nlp_engine
+        import json
+        if extracted_text:
+            nlp_data = nlp_engine.analyze_document(extracted_text)
+            ai_summary = nlp_data.get("summary", "")
+            entities_json = json.dumps(nlp_data.get("entities", {}))
+    except Exception as e:
+        print(f"NLP Engine skipped: {e}")
+
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
     try:
@@ -563,7 +601,9 @@ def update_document(
         document_id=document_id, version_number=new_version_num,
         file_path=object_name, file_hash=file_hash,
         status="Active", uploaded_by=user_id,
-        extracted_text=extracted_text
+        extracted_text=extracted_text,
+        ai_summary=ai_summary,
+        entities=entities_json
     )
     db.add(new_version)
 

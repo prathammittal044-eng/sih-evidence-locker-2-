@@ -40,6 +40,8 @@ class DocumentVersion(Base):
     file_hash = Column(String)  # SHA-256
     status = Column(String) # 'Active', 'Superseded', 'Inactive'
     extracted_text = Column(Text, nullable=True)  # For AI Search + OCR Preview
+    ai_summary = Column(Text, nullable=True)
+    entities = Column(Text, nullable=True)
     uploaded_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     document = relationship("Document", back_populates="versions")

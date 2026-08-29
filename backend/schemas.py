@@ -18,6 +18,9 @@ class DocumentVersion(BaseModel):
     file_hash: str
     created_at: datetime
     uploaded_by: int
+    extracted_text: Optional[str] = None
+    ai_summary: Optional[str] = None
+    entities: Optional[str] = None
 
     class Config:
         from_attributes = True
