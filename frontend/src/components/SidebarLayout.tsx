@@ -31,14 +31,14 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       {/* --- LEFT SIDEBAR --- */}
       <aside className="w-64 bg-[#0a192f] text-slate-300 flex flex-col flex-shrink-0">
         
-        {/* Logo Area — Centered + Big */}
-        <div className="flex flex-col items-center justify-center py-5 px-4 border-b border-slate-700/50 bg-[#061020] gap-2">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-xl p-2">
+        {/* Logo Area */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50 bg-[#061020]">
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-lg p-1.5">
             <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain" />
           </div>
-          <div className="text-center">
-            <p className="text-[10px] font-bold tracking-widest text-blue-300 uppercase leading-tight">भारत सरकार</p>
-            <h1 className="text-white font-black tracking-widest text-sm leading-tight mt-0.5">EVIDENCE LOCKER</h1>
+          <div>
+            <p className="text-[9px] font-bold tracking-widest text-blue-300 uppercase leading-tight">भारत सरकार</p>
+            <h1 className="text-white font-black tracking-wide text-xs leading-tight mt-0.5">EVIDENCE LOCKER</h1>
           </div>
         </div>
 
