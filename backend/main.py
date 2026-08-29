@@ -473,7 +473,6 @@ def upload_document(
             detail="This case has been permanently sealed by a Judge. No new documents can be added.")
 
     file_content = file.file.read()
-    file_hash = hashlib.sha256(file_content).hexdigest()
     object_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, object_name)
     extracted_text = extract_text(file_content, file.filename)
@@ -490,8 +489,15 @@ def upload_document(
     db.commit()
     db.refresh(db_doc)
 
+    # --- Unique hash per version: SHA-256(file_content + case_id + doc_id + version) ---
+    # This ensures that v1 and v2 of the same file get DIFFERENT hashes,
+    # and the same file in two different cases also gets DIFFERENT hashes.
+    version_number = 1
+    hash_salt = f"|case:{case_id}|doc:{db_doc.id}|version:{version_number}".encode()
+    file_hash = hashlib.sha256(file_content + hash_salt).hexdigest()
+
     db_version = models.DocumentVersion(
-        document_id=db_doc.id, version_number=1,
+        document_id=db_doc.id, version_number=version_number,
         file_path=object_name, file_hash=file_hash,
         status="Active", uploaded_by=user_id,
         extracted_text=extracted_text,
@@ -506,7 +512,7 @@ def upload_document(
     saved_image_names = extract_and_save_images(file_content, file.filename, db_version.id, db)
     image_paths = [os.path.join(UPLOAD_DIR, img) for img in (saved_image_names or [])]
 
-    # --- AI NLP Insights (Summary + Entities) ---
+    # --- AI NLP Insights (Summary + Entities + Clean Text) ---
     ai_summary = ""
     entities_json = "{}"
     try:
@@ -515,10 +521,15 @@ def upload_document(
         nlp_data = nlp_engine.analyze_document(extracted_text, image_paths=image_paths)
         ai_summary = nlp_data.get("summary", "")
         entities_json = json.dumps(nlp_data.get("entities", {}))
+        
+        # Override the messy Tesseract text with Gemini's perfect transcription if available
+        if "full_text" in nlp_data and nlp_data["full_text"]:
+            extracted_text = nlp_data["full_text"]
     except Exception as e:
         print(f"NLP Engine skipped: {e}")
 
     # Save NLP results back to the version
+    db_version.extracted_text = extracted_text
     db_version.ai_summary = ai_summary
     db_version.entities = entities_json
     db.commit()
@@ -578,7 +589,9 @@ def update_document(
         new_version_num = 1
 
     file_content = file.file.read()
-    file_hash = hashlib.sha256(file_content).hexdigest()
+    # --- Unique hash per version: SHA-256(file_content + doc_id + version) ---
+    hash_salt = f"|case:{doc.case_id}|doc:{document_id}|version:{new_version_num}".encode()
+    file_hash = hashlib.sha256(file_content + hash_salt).hexdigest()
     object_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, object_name)
     extracted_text = extract_text(file_content, file.filename)
@@ -643,6 +656,11 @@ def verify_document_integrity(document_id: int, db: Session = Depends(get_db)):
     versions = db.query(models.DocumentVersion).filter(models.DocumentVersion.document_id == document_id).all()
     if not versions:
         raise HTTPException(status_code=404, detail="No versions found")
+
+    # Look up the document to get case_id for the salt
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    case_id = doc.case_id if doc else 0
+
     results = []
     for v in versions:
         try:
@@ -651,11 +669,18 @@ def verify_document_integrity(document_id: int, db: Session = Depends(get_db)):
                 results.append({"version": v.version_number, "status": "MISSING", "message": "File was deleted from the server!"})
                 continue
             with open(full_path, "rb") as f:
-                current_hash = hashlib.sha256(f.read()).hexdigest()
+                file_bytes = f.read()
+
+            # Recompute using the SAME salted formula used at upload time
+            hash_salt = f"|case:{case_id}|doc:{document_id}|version:{v.version_number}".encode()
+            current_hash = hashlib.sha256(file_bytes + hash_salt).hexdigest()
+
             if current_hash == v.file_hash:
-                results.append({"version": v.version_number, "status": "VERIFIED", "message": "Cryptographic hash matches. File is intact."})
+                results.append({"version": v.version_number, "status": "VERIFIED",
+                                 "message": "Cryptographic hash matches. File is intact."})
             else:
-                results.append({"version": v.version_number, "status": "TAMPERED", "message": "ALERT: File content does not match the original hash!"})
+                results.append({"version": v.version_number, "status": "TAMPERED",
+                                 "message": "ALERT: File content does not match the original hash!"})
         except Exception as e:
             results.append({"version": v.version_number, "status": "ERROR", "message": f"Could not read file: {str(e)}"})
     return {"document_id": document_id, "integrity_checks": results}
