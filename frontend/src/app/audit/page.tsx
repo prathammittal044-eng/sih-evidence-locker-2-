@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { ShieldAlert, Activity, FileText, Upload, RefreshCw, Eye } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -35,7 +36,9 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="text-slate-900 font-sans w-full">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <Navbar showBack={true} title="SYSTEM AUDIT LOG" />
+
       <main className="p-8 max-w-6xl mx-auto">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
