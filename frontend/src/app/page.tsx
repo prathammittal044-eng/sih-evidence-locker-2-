@@ -167,90 +167,128 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       <Navbar />
 
-      <main className="p-8 max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Active Cases</h2>
-            <p className="text-slate-500 mt-1">Manage and securely upload evidence to your assigned cases.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            <div className="relative w-full sm:w-[500px]">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
-              </div>
-              <input type="text" placeholder="Natural AI Search: Describe what you're looking for..."
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg bg-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm" />
+      <main className="p-6 max-w-[1400px] mx-auto w-full">
+        <div className="flex flex-col lg:flex-row gap-6">
+          
+          {/* ===================== SIDEBAR ===================== */}
+          <div className="w-full lg:w-72 flex-shrink-0 space-y-6">
+            
+            {/* Action Panel */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Quick Actions</h3>
+              {canCreateCase ? (
+                <button onClick={() => setShowModal(true)}
+                  className="w-full bg-[#1a3a6b] hover:bg-[#132a4f] text-white py-3 rounded-lg font-bold shadow-md transition-colors flex items-center justify-center gap-2">
+                  <Plus className="w-5 h-5" /> Register New Case
+                </button>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-sm text-slate-500 font-medium">
+                  <ShieldCheck className="w-6 h-6 mx-auto mb-2 text-slate-400" />
+                  Your role ({currentUser?.role}) does not have permission to register new cases.
+                </div>
+              )}
             </div>
-            {canCreateCase && (
-              <button onClick={() => setShowModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-colors whitespace-nowrap flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Register New Case
-              </button>
-            )}
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedCases.map((c: any) => {
-            const meta = getCaseMeta(c.id);
-            return (
-              <Link href={`/case/${c.id}`} key={c.id}>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-xl hover:border-blue-400 transition-all cursor-pointer group relative overflow-hidden h-full flex flex-col">
-                  <div className={`absolute top-0 left-0 w-1 h-full ${c.is_sealed ? 'bg-red-500' : 'bg-blue-600'} group-hover:opacity-80 transition-all`} />
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-2.5 py-1 rounded-md">
-                      {c.case_number}
-                    </span>
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md border flex items-center gap-1 ${c.is_sealed ? 'bg-red-50 text-red-700 border-red-200' : c.status === 'Open' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                      {c.is_sealed && <Lock className="w-3 h-3" />} {c.status}
-                    </span>
+            {/* System Overview */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">System Overview</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Total Registered Cases</p>
+                  <p className="text-3xl font-black text-[#1a3a6b]">{cases.length}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                    <p className="text-xs text-green-700 font-bold uppercase">Active</p>
+                    <p className="text-xl font-black text-green-800">{cases.filter((c: any) => !c.is_sealed).length}</p>
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition-colors mb-2 flex items-center gap-2">
-                    <Folder className="w-5 h-5 text-slate-400 group-hover:text-blue-500 flex-shrink-0" />
-                    {c.title}
-                  </h3>
-                  {meta && (
-                    <div className="space-y-1 mb-3">
-                      {meta.crime_type && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <Tag className="w-3 h-3" /> {meta.crime_type}
-                        </div>
-                      )}
-                      {meta.location && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <MapPin className="w-3 h-3" /> {meta.location}
-                        </div>
-                      )}
-                      {meta.incident_date && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <Calendar className="w-3 h-3" /> Incident: {meta.incident_date}
-                        </div>
-                      )}
-                      {meta.ipc_sections?.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <Hash className="w-3 h-3" /> IPC: {meta.ipc_sections.slice(0, 2).join(', ')}{meta.ipc_sections.length > 2 ? ` +${meta.ipc_sections.length - 2} more` : ''}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-sm text-slate-500 flex items-center gap-1.5">
-                      <FileText className="w-4 h-4" /> {c.documents?.length || 0} Documents
-                    </span>
-                    <span className="text-sm font-bold text-blue-600 group-hover:translate-x-1 transition-transform">Open →</span>
+                  <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                    <p className="text-xs text-red-700 font-bold uppercase">Sealed</p>
+                    <p className="text-xl font-black text-red-800">{cases.filter((c: any) => c.is_sealed).length}</p>
                   </div>
                 </div>
-              </Link>
-            );
-          })}
-          {sortedCases.length === 0 && (
-            <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-              <ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No cases found matching your description.</p>
-              {canCreateCase && <p className="text-slate-400 text-sm mt-1">Click "Register New Case" to create your first case.</p>}
+              </div>
             </div>
-          )}
+
+          </div>
+
+          {/* ===================== MAIN DOSSIER AREA ===================== */}
+          <div className="flex-1 min-w-0 flex flex-col gap-5">
+            
+            {/* Search Bar */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2">
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-blue-600" />
+                </div>
+                <input type="text" placeholder="Natural AI Search: Try 'Cyber fraud in Delhi' or 'FIR-2026-104'..."
+                  value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="block w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-lg text-slate-800 font-medium placeholder-slate-400 focus:ring-2 focus:ring-blue-600 sm:text-sm transition-all" />
+              </div>
+            </div>
+
+            {/* Case List */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h2 className="text-lg font-black text-[#1a3a6b] tracking-wide">CASE DOSSIERS</h2>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{sortedCases.length} Results</span>
+              </div>
+              
+              <div className="divide-y divide-slate-100">
+                {sortedCases.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <Folder className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">No cases found matching your criteria.</p>
+                  </div>
+                ) : (
+                  sortedCases.map((c: any) => {
+                    const meta = getCaseMeta(c.id);
+                    return (
+                      <Link href={`/case/${c.id}`} key={c.id} className="block hover:bg-blue-50 transition-colors group">
+                        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          
+                          <div className="flex items-start gap-4 flex-1 min-w-0">
+                            {/* Case Number Badge */}
+                            <div className={`w-28 flex-shrink-0 text-center py-1.5 rounded border font-mono text-xs font-bold ${c.is_sealed ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-[#1a3a6b] border-slate-300'}`}>
+                              {c.case_number}
+                            </div>
+                            
+                            {/* Main Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-base font-black text-slate-800 group-hover:text-blue-700 truncate">{c.title}</h3>
+                                {c.is_sealed && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1"><Lock className="w-3 h-3"/> Sealed</span>}
+                              </div>
+                              {meta && (
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
+                                  {meta.crime_type && <span className="flex items-center gap-1"><Tag className="w-3 h-3 text-slate-400" /> {meta.crime_type}</span>}
+                                  {meta.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {meta.location}</span>}
+                                  {meta.incident_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-slate-400" /> {meta.incident_date}</span>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Stats & Action */}
+                          <div className="flex items-center gap-6 sm:pl-4 sm:border-l border-slate-200">
+                            <div className="text-center min-w-[70px]">
+                              <p className="text-xl font-black text-slate-700 leading-none">{c.documents?.length || 0}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Docs</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-full bg-white border-2 border-slate-200 group-hover:border-blue-500 group-hover:bg-blue-600 flex items-center justify-center transition-all flex-shrink-0">
+                              <span className="text-slate-400 group-hover:text-white font-bold leading-none translate-x-px">→</span>
+                            </div>
+                          </div>
+
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       </main>
 
