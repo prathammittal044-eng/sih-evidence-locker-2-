@@ -40,7 +40,8 @@ if not OCR_AVAILABLE:
 
 # Use the custom tessdata directory which has both eng + hin models
 _CUSTOM_TESSDATA = r'C:\Users\prath\AppData\Local\tessdata'
-_TESSDATA_CONFIG = f'--tessdata-dir "{_CUSTOM_TESSDATA}"' if os.path.isdir(_CUSTOM_TESSDATA) else ''
+_TESSDATA_CONFIG = f'--tessdata-dir {_CUSTOM_TESSDATA}' if os.path.isdir(_CUSTOM_TESSDATA) else ''
+os.environ['TESSDATA_PREFIX'] = _CUSTOM_TESSDATA
 
 # Detect available languages
 _HIN_AVAILABLE = os.path.exists(os.path.join(_CUSTOM_TESSDATA, 'hin.traineddata'))
