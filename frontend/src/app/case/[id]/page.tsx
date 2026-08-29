@@ -77,9 +77,12 @@ export default function CaseDetails() {
     fetchCase();
   }, [id]);
 
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleUpload = async (e: any) => {
     e.preventDefault();
-    if (!canUpload) return;
+    if (!canUpload || isUploading) return;
+    setIsUploading(true);
     const formData = new FormData(e.target);
     formData.append('user_id', currentUserId.toString());
     try {
@@ -88,6 +91,7 @@ export default function CaseDetails() {
       if (res.ok) { alert('Document securely uploaded and sealed!'); fetchCase(); e.target.reset(); }
       else        { alert(`Error: ${data.detail}`); }
     } catch { alert('Network error — is the backend running?'); }
+    finally { setIsUploading(false); }
   };
 
   const handleVerify = async (document_id: number) => {
@@ -668,6 +672,26 @@ export default function CaseDetails() {
           </div>
         </div>
       </main>
+
+      {/* ── UPLOADING / OCR SCANNING DIALOG OVERLAY ── */}
+      {isUploading && (
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center border-t-4 border-blue-600">
+            <div className="relative w-16 h-16 mx-auto mb-6">
+              <RefreshCw className="w-16 h-16 text-blue-600 animate-spin opacity-20" />
+              <ScanText className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">Processing Document</h3>
+            <p className="text-sm text-slate-500 font-medium">
+              Uploading securely...<br/>
+              Running OCR & AI Analysis...
+            </p>
+            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-6 overflow-hidden">
+              <div className="bg-blue-600 h-1.5 rounded-full animate-pulse w-full"></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
