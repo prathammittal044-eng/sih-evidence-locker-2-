@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -33,10 +33,14 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
         
         {/* Logo Area */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-700/50 bg-[#061020]">
-          <Shield className="w-7 h-7 text-blue-400" />
+          <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow">
+            <span className="text-sm">dY"</span>
+          </div>
           <div>
-            <h1 className="text-white font-black tracking-widest text-sm leading-tight">GovVault</h1>
-            <p className="text-[10px] text-blue-400 tracking-wider font-bold">SECURE NETWORK</p>
+            <p className="text-[9px] font-bold tracking-widest text-blue-300 uppercase leading-none mb-0.5">
+               - _     ,    _  A
+            </p>
+            <h1 className="text-white font-black tracking-widest text-xs leading-tight">EVIDENCE LOCKER</h1>
           </div>
         </div>
 
@@ -53,9 +57,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
           </Link>
           <Link href="/audit" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${pathname === '/audit' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
             <ClipboardList className="w-5 h-5" /> Audit Trail
-          </Link>
-          <Link href="#" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors hover:bg-slate-800 hover:text-white text-slate-500">
-            <Settings className="w-5 h-5" /> Settings
           </Link>
         </nav>
 
