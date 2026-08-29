@@ -61,21 +61,30 @@ def analyze_with_gemini(text: str, image_paths: List[str] = None) -> Dict[str, A
 
     prompt = """You are an AI assistant analyzing an Indian government legal document (FIR - First Information Report).
 
-This document is in a bilingual format (English + Hindi/Marathi). Please analyze it and provide:
+This document is in a bilingual format (English + Hindi/Marathi) and includes handwritten cursive English. Please analyze it and provide:
 
-1. EXECUTIVE SUMMARY: A clear, concise 3-4 sentence summary in English describing:
+1. FULL TEXT: A clean, perfectly transcribed English-only version of the document.
+   - Translate all Hindi/Marathi printed labels entirely to English.
+   - For the handwritten cursive English, aggressively auto-correct the spelling and grammar into coherent sentences (e.g., if it looks like "home to fiam", correct it to "home to find").
+   - Do NOT include any Devanagari script. Do NOT include any garbled OCR junk.
+
+2. EXECUTIVE SUMMARY: A clear, concise 3-4 sentence summary in English describing:
    - What crime was reported
    - Who is the complainant
    - Where and when it occurred
    - Key evidence or stolen items mentioned
 
-2. EXTRACTED ENTITIES as JSON with these exact keys:
+3. EXTRACTED ENTITIES as JSON with these exact keys:
    - "PERSON": list of real person names mentioned
    - "GPE": list of locations/places (cities, addresses)
    - "ORG": list of organizations (police stations, courts)
    - "DATE": list of dates and times mentioned
 
 Respond in this exact format:
+
+FULL TEXT:
+<perfectly transcribed document text here>
+
 SUMMARY:
 <your summary here>
 
@@ -113,12 +122,16 @@ ENTITIES:
         )
         raw = response.text.strip()
 
+        full_text = text  # Fallback to Tesseract if parse fails
         summary = ""
         entities = {"PERSON": [], "ORG": [], "GPE": [], "DATE": []}
 
-        if "SUMMARY:" in raw and "ENTITIES:" in raw:
-            summary_part = raw.split("ENTITIES:")[0].replace("SUMMARY:", "").strip()
+        if "FULL TEXT:" in raw and "SUMMARY:" in raw and "ENTITIES:" in raw:
+            text_part = raw.split("SUMMARY:")[0].replace("FULL TEXT:", "").strip()
+            summary_part = raw.split("SUMMARY:")[1].split("ENTITIES:")[0].strip()
             entities_part = raw.split("ENTITIES:")[1].strip()
+            
+            full_text = text_part
             summary = summary_part
             try:
                 json_match = re.search(r'\{.*\}', entities_part, re.DOTALL)
@@ -132,7 +145,7 @@ ENTITIES:
         else:
             summary = raw
 
-        return {"summary": summary, "entities": entities, "engine": "gemini-vision"}
+        return {"full_text": full_text, "summary": summary, "entities": entities, "engine": "gemini-vision"}
 
     except Exception as e:
         print(f"[NLP] Gemini analysis failed: {e}")
