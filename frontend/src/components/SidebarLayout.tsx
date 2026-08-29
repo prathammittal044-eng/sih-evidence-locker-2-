@@ -32,15 +32,15 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       <aside className="w-64 bg-[#0a192f] text-slate-300 flex flex-col flex-shrink-0">
         
         {/* Logo Area */}
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-700/50 bg-[#061020]">
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow p-1">
-            <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain" />
+        <div className="h-20 flex items-center gap-3 px-6 border-b border-slate-700/50 bg-[#061020]">
+          <div className="w-14 h-14 flex items-center justify-center flex-shrink-0">
+            <img src="/emblem.png" alt="Emblem of India" className="w-full h-full object-contain filter invert brightness-0" style={{ filter: 'invert(1) brightness(100)' }} />
           </div>
-          <div>
-            <p className="text-[9px] font-bold tracking-widest text-blue-300 uppercase leading-none mb-0.5">
+          <div className="flex flex-col justify-center">
+            <p className="text-[10px] font-bold tracking-widest text-blue-300 uppercase leading-tight">
                भारत सरकार
             </p>
-            <h1 className="text-white font-black tracking-widest text-xs leading-tight">EVIDENCE LOCKER</h1>
+            <h1 className="text-white font-black tracking-widest text-sm leading-tight">EVIDENCE LOCKER</h1>
           </div>
         </div>
 
