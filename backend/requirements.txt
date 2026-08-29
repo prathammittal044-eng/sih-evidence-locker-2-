@@ -11,3 +11,5 @@ pdf2image
 web3
 py-solc-x
 requests
+python-jose[cryptography]
+passlib[bcrypt]
