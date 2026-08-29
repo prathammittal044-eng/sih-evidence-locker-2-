@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, get_db
 import hashlib
+import threading
+import blockchain_logger
 import os
 import uuid
 import subprocess
@@ -550,6 +552,14 @@ def upload_document(
             text=extracted_text
         )
 
+
+    # --- Blockchain Logging ---
+    try:
+        evidence_id = f"case_{case_id}_doc_{db_doc.id}_v{version_number}"
+        threading.Thread(target=blockchain_logger.log_hash_to_blockchain, args=(evidence_id, file_hash), daemon=True).start()
+    except Exception as e:
+        print(f"Blockchain logging failed: {e}")
+
     return {"message": "Document uploaded securely", "document_id": db_doc.id, "hash": file_hash}
 
 # -------------------------------------------------------
@@ -670,6 +680,14 @@ def update_document(
             text=extracted_text
         )
 
+
+    # --- Blockchain Logging ---
+    try:
+        evidence_id = f"case_{doc.case_id}_doc_{document_id}_v{new_version_num}"
+        threading.Thread(target=blockchain_logger.log_hash_to_blockchain, args=(evidence_id, file_hash), daemon=True).start()
+    except Exception as e:
+        print(f"Blockchain logging failed: {e}")
+
     return {"message": f"Document updated to version {new_version_num}", "hash": file_hash}
 
 # -------------------------------------------------------
@@ -700,8 +718,21 @@ def verify_document_integrity(document_id: int, db: Session = Depends(get_db)):
             current_hash = hashlib.sha256(file_bytes + hash_salt).hexdigest()
 
             if current_hash == v.file_hash:
+                message = "Cryptographic hash matches Local DB."
+                try:
+                    evidence_id = f"case_{case_id}_doc_{document_id}_v{v.version_number}"
+                    bc_result = blockchain_logger.verify_hash_on_blockchain(evidence_id, current_hash)
+                    if bc_result.get("status") == "verified":
+                        message = "VERIFIED BY POLYGON BLOCKCHAIN. Cryptographic hash perfectly matches the immutable ledger."
+                    elif bc_result.get("status") == "tampered":
+                        results.append({"version": v.version_number, "status": "TAMPERED", "message": "ALERT: Hash does not match the Blockchain Ledger!"})
+                        continue
+                except Exception as e:
+                    pass
+
                 results.append({"version": v.version_number, "status": "VERIFIED",
-                                 "message": "Cryptographic hash matches. File is intact."})
+                                 "message": message})
+
             else:
                 results.append({"version": v.version_number, "status": "TAMPERED",
                                  "message": "ALERT: File content does not match the original hash!"})

@@ -428,7 +428,7 @@ export default function CaseDetails() {
                                     className="flex items-center gap-1 bg-white border-2 border-green-200 text-green-700 hover:bg-green-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Verify Integrity
                                   </button>
-                                  <a href="https://amoy.polygonscan.com/address/0xF217F6823Ed1a3D7AC3A606a879c0DeF65B4242D" target="_blank" rel="noreferrer"
+                                  <a href="https://amoy.polygonscan.com/address/0x8784D3f0161a3bA1941942748041583b22CE286E" target="_blank" rel="noreferrer"
                                     className="flex items-center gap-1 bg-[#8247E5] border-2 border-[#8247E5] text-white hover:bg-[#6c3bbf] px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
                                     <svg viewBox="0 0 40 40" className="w-3.5 h-3.5 fill-current"><path d="M26.2208 13.6847L20 9.87062L13.7792 13.6847V21.3129L20 25.1271L26.2208 21.3129V13.6847ZM28.4357 22.5956L20 27.7661L11.5643 22.5956V12.4045L20 7.23395L28.4357 12.4045V22.5956Z"></path><path d="M20.0001 27.7662L11.5645 32.9367V22.5957L20.0001 27.7662Z"></path><path d="M11.5645 12.4044L20.0001 7.23389V17.5749L11.5645 12.4044Z"></path><path d="M28.4357 12.4044L20.0001 17.5749V7.23389L28.4357 12.4044Z"></path><path d="M20.0001 27.7662L28.4357 22.5957V32.9367L20.0001 27.7662Z"></path></svg>
                                     Polygonscan
