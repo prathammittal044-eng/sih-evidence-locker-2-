@@ -594,21 +594,8 @@ def update_document(
     file_hash = hashlib.sha256(file_content + hash_salt).hexdigest()
     object_name = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, object_name)
-    extracted_text = extract_text(file_content, file.filename)
 
-    # --- AI NLP Insights (Summary + Entities) ---
-    ai_summary = ""
-    entities_json = "{}"
-    try:
-        import nlp_engine
-        import json
-        if extracted_text:
-            nlp_data = nlp_engine.analyze_document(extracted_text)
-            ai_summary = nlp_data.get("summary", "")
-            entities_json = json.dumps(nlp_data.get("entities", {}))
-    except Exception as e:
-        print(f"NLP Engine skipped: {e}")
-
+    # Step 1: Save file to disk first (Gemini needs the physical file path)
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
     try:
@@ -616,22 +603,62 @@ def update_document(
     except Exception as e:
         print(f"Failed to lock file {file_path}: {e}")
 
+    # Step 2: Tesseract fallback text (used only if Gemini is unavailable)
+    extracted_text = extract_text(file_content, file.filename)
+
+    # Step 3: Save a temporary DB record so we can extract images with proper version ID
     new_version = models.DocumentVersion(
         document_id=document_id, version_number=new_version_num,
         file_path=object_name, file_hash=file_hash,
         status="Active", uploaded_by=user_id,
         extracted_text=extracted_text,
-        ai_summary=ai_summary,
-        entities=entities_json
+        ai_summary="",
+        entities="{}"
     )
     db.add(new_version)
+    db.commit()
+    db.refresh(new_version)
+
+    # Step 4: Extract images (Gemini Vision needs the image file paths)
+    extract_and_save_images(file_content, file.filename, new_version.id, db)
+
+    # Step 5: Collect image paths and send to Gemini Vision (same as initial upload)
+    import json
+    ai_summary = ""
+    entities_json = "{}"
+    try:
+        import nlp_engine
+        image_records = db.query(models.DocumentImage).filter(
+            models.DocumentImage.document_version_id == new_version.id
+        ).all()
+        image_paths = [os.path.join(UPLOAD_DIR, img.image_path) for img in image_records]
+
+        if image_paths:
+            # Gemini Vision analyzes the actual images — no garbled Tesseract text!
+            nlp_data = nlp_engine.analyze_document(extracted_text, image_paths=image_paths)
+        else:
+            nlp_data = nlp_engine.analyze_document(extracted_text)
+
+        # Overwrite extracted_text with Gemini's perfect full_text
+        gemini_full_text = nlp_data.get("full_text", "")
+        if gemini_full_text:
+            extracted_text = gemini_full_text
+
+        ai_summary = nlp_data.get("summary", "")
+        entities_json = json.dumps(nlp_data.get("entities", {}))
+    except Exception as e:
+        print(f"NLP Engine skipped: {e}")
+
+    # Step 6: Update the DB record with the final Gemini-analysed text
+    new_version.extracted_text = extracted_text
+    new_version.ai_summary = ai_summary
+    new_version.entities = entities_json
 
     u = get_user_info(user_id)
     audit = models.AuditLog(user_id=user_id, action="CREATE_VERSION",
         details=f"{u['name']} ({u['role']}, Badge {u['badge']}) updated document '{doc.name}' to v{new_version_num}")
     db.add(audit)
     db.commit()
-    db.refresh(new_version)
 
     # --- Vector Index ---
     if VECTOR_SEARCH_ENABLED and extracted_text:
@@ -642,9 +669,6 @@ def update_document(
             doc_type=doc.doc_type,
             text=extracted_text
         )
-
-    # --- OCR Image Extraction ---
-    extract_and_save_images(file_content, file.filename, new_version.id, db)
 
     return {"message": f"Document updated to version {new_version_num}", "hash": file_hash}
 
