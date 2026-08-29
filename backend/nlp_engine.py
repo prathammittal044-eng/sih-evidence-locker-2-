@@ -77,12 +77,26 @@ def generate_summary(text: str, num_sentences: int = 3) -> str:
     return " ".join([item[1] for item in top_n])
 
 def analyze_document(text: str) -> Dict[str, any]:
-    """Full NLP pipeline for a document."""
+    """Full NLP pipeline for a document (translates to English first)."""
     if not text.strip():
         return {"summary": "", "entities": {}}
         
-    summary = generate_summary(text, num_sentences=4)
-    entities = extract_entities(text)
+    # Attempt to translate text to English using deep_translator
+    try:
+        from deep_translator import GoogleTranslator
+        # GoogleTranslator has a max char limit of 5000 per request, so we chunk if needed
+        translator = GoogleTranslator(source='auto', target='en')
+        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+        translated_chunks = []
+        for chunk in chunks:
+            translated_chunks.append(translator.translate(chunk))
+        english_text = " ".join(translated_chunks)
+    except Exception as e:
+        print(f"[NLP] Translation failed: {e}")
+        english_text = text  # Fallback to original text
+        
+    summary = generate_summary(english_text, num_sentences=4)
+    entities = extract_entities(english_text)
     
     return {
         "summary": summary,
